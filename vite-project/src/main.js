@@ -122,7 +122,7 @@ renderer.toneMapping = THREE.NoToneMapping;
 // ─── Sky & Environment ────────────────────────────────────────────────────────
 
 const hdri = new HDRLoader();
-const envMap = await hdri.loadAsync( 'src/assets/hdri/brown_photostudio_06_2k.hdr' );
+const envMap = await hdri.loadAsync( '/hdri/brown_photostudio_06_2k.hdr' );
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 scene.environment = envMap;
 scene.environmentRotation.set(0, 36, 0);
@@ -170,7 +170,7 @@ dracoLoader.setDecoderPath('jsm/libs/draco/gltf/');
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 loader.load(
-  'src/assets/gltf/stove.glb',
+  '/gltf/stove.glb',
   (gltf) => {
     model = gltf.scene;
     model.position.set(0, 1, 0);
