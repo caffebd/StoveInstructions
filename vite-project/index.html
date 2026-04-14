@@ -165,6 +165,58 @@
         }
       }
 
+      /* ─── Landscape phone ────────────────────────────────────────────────── */
+      @media (orientation: landscape) and (max-height: 500px) {
+        #instructions-overlay {
+          top: calc(6px + env(safe-area-inset-top, 0px));
+          left: calc(6px + env(safe-area-inset-left, 0px));
+          right: auto;
+          max-width: min(42vw, 260px);
+          max-height: calc(100dvh - 12px);
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          padding: 10px 12px;
+        }
+
+        #instructions-overlay h2 {
+          font-size: 15px;
+        }
+
+        #instructions-overlay p {
+          font-size: 13px;
+          line-height: 1.4;
+        }
+
+        #overlay-header {
+          margin-bottom: 6px;
+        }
+
+        #buttons {
+          bottom: auto;
+          top: 50%;
+          left: auto;
+          right: calc(8px + env(safe-area-inset-right, 0px));
+          transform: translateY(-50%);
+          flex-direction: column;
+          flex-wrap: nowrap;
+          justify-content: flex-start;
+          gap: 6px;
+          width: auto;
+        }
+
+        #buttons button {
+          flex: 0 0 auto;
+          width: 80px;
+          padding: 8px 6px;
+          font-size: 12px;
+        }
+
+        #btn-reset {
+          flex: 0 0 auto;
+          width: 80px;
+        }
+      }
+
       #loading-overlay {
         position: fixed;
         inset: 0;
@@ -236,10 +288,8 @@
         background: rgba(255, 255, 255, 0.65);
       }
 
-      @media (max-width: 768px) {
-        #zoom-buttons {
-          display: none;
-        }
+      .is-mobile #zoom-buttons {
+        display: none;
       }
     </style>
   </head>

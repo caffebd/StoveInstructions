@@ -81,6 +81,7 @@ camera.position.set(5, 2, 8);
 // ─── Device Detection ────────────────────────────────────────────────────────
 
 const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth <= 768;
+document.body.classList.toggle('is-mobile', isMobile);
 
 // ─── Renderer ─────────────────────────────────────────────────────────────────
 
@@ -234,11 +235,22 @@ loader.load(
 
 // ─── Resize ───────────────────────────────────────────────────────────────────
 
+function handleMobileOrientation() {
+  const isLandscape = window.innerWidth > window.innerHeight;
+  const overlay = document.getElementById('instructions-overlay');
+  const btn = document.getElementById('collapse-btn');
+  overlay.classList.toggle('collapsed', isLandscape);
+  if (btn) btn.textContent = isLandscape ? '\u25b2' : '\u25bc';
+}
+
+if (isMobile) handleMobileOrientation();
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
+  if (isMobile) handleMobileOrientation();
 });
 
 function jumpToEnd(action) {
