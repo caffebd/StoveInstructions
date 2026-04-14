@@ -17,6 +17,7 @@ let mixer;
 let model;
 const actions = {};
 const finishedActions = new Set();
+let zoomDirection = 0;
 
 const stepNames = [
   'STOVE2-TOP.001Action',
@@ -153,13 +154,30 @@ controls.target.set(0, 0.7, 0);
 controls.mouseButtons = {
   LEFT: THREE.MOUSE.PAN = 2,
   MIDDLE: THREE.MOUSE.ROTATE = 0,
-  RIGHT: THREE.MOUSE.ZOOM
+  RIGHT: THREE.MOUSE.ROTATE
   };
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN,
 };
+controls.minDistance = 2;
+controls.maxDistance = 25;
 controls.update();
+
+// ─── Zoom Buttons (desktop only) ─────────────────────────────────────────────
+
+if (!isMobile) {
+  const zoomInBtn = document.getElementById('btn-zoom-in');
+  const zoomOutBtn = document.getElementById('btn-zoom-out');
+
+  function stopZoom() { zoomDirection = 0; }
+
+  zoomInBtn.addEventListener('mousedown', () => { zoomDirection = 1; });
+  zoomOutBtn.addEventListener('mousedown', () => { zoomDirection = -1; });
+  window.addEventListener('mouseup', stopZoom);
+  zoomInBtn.addEventListener('mouseleave', stopZoom);
+  zoomOutBtn.addEventListener('mouseleave', stopZoom);
+}
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -276,6 +294,16 @@ function animate() {
   timer.update();
 
   const delta = timer.getDelta();
+
+  if (zoomDirection !== 0) {
+    const zoomSpeed = 0.012;
+    const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+    const newDist = Math.max(controls.minDistance, Math.min(controls.maxDistance,
+      offset.length() * (1 - zoomDirection * zoomSpeed)
+    ));
+    offset.setLength(newDist);
+    camera.position.copy(controls.target).add(offset);
+  }
 
   mixer.update(delta);
   controls.update();

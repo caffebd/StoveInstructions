@@ -201,6 +201,46 @@
         font-size: 14px;
         letter-spacing: 0.05em;
       }
+
+      #zoom-buttons {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 100;
+      }
+
+      #zoom-buttons button {
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.25);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition: background 0.15s;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #zoom-buttons button:hover {
+        background: rgba(255, 255, 255, 0.45);
+      }
+
+      #zoom-buttons button:active {
+        background: rgba(255, 255, 255, 0.65);
+      }
+
+      @media (max-width: 768px) {
+        #zoom-buttons {
+          display: none;
+        }
+      }
     </style>
   </head>
   <body>
@@ -224,6 +264,23 @@
       <button id="btn-3">Step 3</button>
       <button id="btn-4">Step 4</button>
       <button id="btn-reset">Reset</button>
+    </div>
+    <div id="zoom-buttons">
+      <button id="btn-zoom-in" aria-label="Zoom in">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="6.5"/>
+          <line x1="15.5" y1="15.5" x2="21" y2="21"/>
+          <line x1="10" y1="7" x2="10" y2="13"/>
+          <line x1="7" y1="10" x2="13" y2="10"/>
+        </svg>
+      </button>
+      <button id="btn-zoom-out" aria-label="Zoom out">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="6.5"/>
+          <line x1="15.5" y1="15.5" x2="21" y2="21"/>
+          <line x1="7" y1="10" x2="13" y2="10"/>
+        </svg>
+      </button>
     </div>
     <script type="module" src="src/main.js"></script>
   </body>
