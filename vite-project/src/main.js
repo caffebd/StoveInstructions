@@ -245,9 +245,7 @@ function handleMobileOrientation() {
 
 if (isMobile) handleMobileOrientation();
 
-function doResize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+function doResize(w, h) {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
@@ -255,20 +253,16 @@ function doResize() {
   if (isMobile) handleMobileOrientation();
 }
 
-let orientationChangeTimeout;
-
-window.addEventListener('resize', doResize);
-
-if (isMobile) {
-  window.addEventListener('orientationchange', () => {
-    // Reset viewport meta to force Chrome & Firefox to recalculate scale correctly
-    const meta = document.querySelector('meta[name="viewport"]');
-    if (meta) meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
-    // Delay resize until Android browser has settled the new layout dimensions
-    clearTimeout(orientationChangeTimeout);
-    orientationChangeTimeout = setTimeout(doResize, 300);
-  });
-}
+// ResizeObserver fires after the browser has finished reflowing the container,
+// giving accurate dimensions on Android regardless of Chrome/Firefox timing.
+const resizeObserver = new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const w = entry.contentRect.width;
+    const h = entry.contentRect.height;
+    if (w > 0 && h > 0) doResize(w, h);
+  }
+});
+resizeObserver.observe(container);
 
 function jumpToEnd(action) {
   action.reset();
