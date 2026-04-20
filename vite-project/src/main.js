@@ -122,8 +122,8 @@ document.body.classList.toggle('is-mobile', isMobile);
 
 
 
-const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
-renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio);
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 container.appendChild(renderer.domElement);
@@ -141,6 +141,7 @@ composer.addPass(renderPass);
 if (!isMobile) {
   const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
   ssaoPass.kernelRadius = 0.5;
+  ssaoPass.kernelSize = 16;  // halved from default 32 — minimal visual difference
   ssaoPass.minDistance = 0.001;
   ssaoPass.maxDistance = 0.1;
   composer.addPass(ssaoPass);
@@ -164,7 +165,6 @@ scene.environment = envMap;
 scene.environmentRotation.set(0, 36, 0);
 // scene.background = envMap;
 scene.background = new THREE.Color(0x878787);
-scene.backgroundBlurriness = 1;
 scene.backgroundIntensity = 0.2;
 scene.environmentIntensity = 1.0;
 
@@ -198,6 +198,11 @@ controls.touches = {
 controls.minDistance = 2;
 controls.maxDistance = 25;
 controls.update();
+
+// ─── On-demand rendering ──────────────────────────────────────────────────────
+
+let needsRender = true;
+controls.addEventListener('change', () => { needsRender = true; });
 
 // ─── Zoom Buttons (desktop only) ─────────────────────────────────────────────
 
@@ -284,6 +289,7 @@ function doResize(w, h) {
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
   composer.setSize(w, h);
+  needsRender = true;
   if (isMobile) handleMobileOrientation();
 }
 
@@ -375,10 +381,17 @@ function animate() {
     ));
     offset.setLength(newDist);
     camera.position.copy(controls.target).add(offset);
+    needsRender = true;
   }
+
+  // Keep rendering while any animation is actively playing
+  if (Object.values(actions).some(a => a.isRunning() && !a.paused)) needsRender = true;
 
   mixer.update(delta);
   controls.update();
 
-  composer.render();
+  if (needsRender) {
+    needsRender = false;
+    composer.render();
+  }
 }
