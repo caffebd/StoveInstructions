@@ -13,6 +13,13 @@ import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
+// Stats tracking
+let _statsFrameCount = 0;
+let _statsFps = 0;
+let _statsLastFpsTime = performance.now();
+let _statsLastFrameTime = performance.now();
+let _statsDomUpdateTime = 0;
+
 let mixer;
 let model;
 const actions = {};
@@ -62,12 +69,39 @@ function updateInstructions(step) {
 const timer = new THREE.Timer();
 timer.connect(document);
 
-// ─── Container & Stats ────────────────────────────────────────────────────────
+// ─── Container ────────────────────────────────────────────────────────────────
 
 const container = document.getElementById('container');
 
-// const stats = new Stats();
-// container.appendChild(stats.dom);
+// ─── Stats Panel ──────────────────────────────────────────────────────────────
+
+document.getElementById('stats-collapse-btn').addEventListener('click', () => {
+  const overlay = document.getElementById('stats-overlay');
+  const btn = document.getElementById('stats-collapse-btn');
+  overlay.classList.toggle('collapsed');
+  btn.textContent = overlay.classList.contains('collapsed') ? '\u25b2' : '\u25bc';
+});
+
+function updateStats(frameMs) {
+  const overlay = document.getElementById('stats-overlay');
+  if (overlay.classList.contains('collapsed')) return;
+
+  const info = renderer.info;
+
+  const fpsEl = document.getElementById('stat-fps');
+  fpsEl.textContent = _statsFps;
+  fpsEl.className = 'stat-value' + (_statsFps >= 50 ? ' good' : _statsFps >= 30 ? '' : ' warn');
+
+  const msEl = document.getElementById('stat-ms');
+  msEl.textContent = frameMs.toFixed(1) + ' ms';
+  msEl.className = 'stat-value' + (frameMs < 20 ? ' good' : frameMs < 34 ? '' : ' warn');
+
+  document.getElementById('stat-calls').textContent = info.render.calls;
+  document.getElementById('stat-tris').textContent = info.render.triangles.toLocaleString();
+  document.getElementById('stat-geo').textContent = info.memory.geometries;
+  document.getElementById('stat-tex').textContent = info.memory.textures;
+  document.getElementById('stat-prog').textContent = info.programs ? info.programs.length : '–';
+}
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
@@ -317,6 +351,21 @@ function animate() {
   timer.update();
 
   const delta = timer.getDelta();
+
+  // ─── Stats ──────────────────────────────────────────────────────────────────
+  const _now = performance.now();
+  const _frameMs = _now - _statsLastFrameTime;
+  _statsLastFrameTime = _now;
+  _statsFrameCount++;
+  if (_now - _statsLastFpsTime >= 1000) {
+    _statsFps = Math.round(_statsFrameCount * 1000 / (_now - _statsLastFpsTime));
+    _statsFrameCount = 0;
+    _statsLastFpsTime = _now;
+  }
+  if (_now - _statsDomUpdateTime > 250) {
+    _statsDomUpdateTime = _now;
+    updateStats(_frameMs);
+  }
 
   if (zoomDirection !== 0) {
     const zoomSpeed = 0.012;
