@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Three.js Scene</title>
     <style>
       * {
@@ -20,17 +20,11 @@
       #container {
         width: 100vw;
         height: 100vh;
-        height: 100dvh;
-      }
-
-      canvas {
-        touch-action: none;
-        display: block;
       }
 
       #buttons {
         position: fixed;
-        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        bottom: 20px;
         left: 50%;
         transform: translateX(-50%);
         display: flex;
@@ -54,50 +48,20 @@
 
       #instructions-overlay {
         position: fixed;
-        top: calc(20px + env(safe-area-inset-top, 0px));
-        left: calc(20px + env(safe-area-inset-left, 0px));
+        top: 20px;
+        left: 20px;
         background: rgba(0, 0, 0, 0.75);
         color: #fff;
         padding: 20px;
         border-radius: 8px;
         max-width: 300px;
         z-index: 200;
-        transition: opacity 0.4s ease, transform 0.4s ease;
-      }
-
-      #instructions-overlay.anim-playing {
-        opacity: 0.1;
-        pointer-events: none;
-      }
-
-      #instructions-overlay.collapsed #instruction-text {
-        display: none;
-      }
-
-      #overlay-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 10px;
+        transition: opacity 0.3s ease;
       }
 
       #instructions-overlay h2 {
+        margin-bottom: 10px;
         font-size: 18px;
-        color: #fff;
-      }
-
-      #collapse-btn {
-        background: none;
-        border: none;
-        color: rgba(255,255,255,0.7);
-        cursor: pointer;
-        font-size: 14px;
-        padding: 0 0 0 12px;
-        line-height: 1;
-        flex-shrink: 0;
-      }
-
-      #collapse-btn:hover {
         color: #fff;
       }
 
@@ -109,30 +73,23 @@
 
       @media (max-width: 768px) {
         #buttons {
-          bottom: 20px;
-          left: 20px;
-          right: 20px;
-          transform: none;
+          bottom: 30px;
           gap: 8px;
           flex-wrap: wrap;
           justify-content: center;
-          padding: 0;
+          padding: 0 10px;
         }
 
         #buttons button {
-          padding: 10px 16px;
-          font-size: 14px;
-          flex: 1 1 calc(50% - 4px);
-        }
-
-        #btn-reset {
-          flex: 1 1 100%;
+          padding: 16px 20px;
+          font-size: 16px;
+          min-width: 70px;
         }
 
         #instructions-overlay {
-          top: calc(10px + env(safe-area-inset-top, 0px));
-          left: calc(10px + env(safe-area-inset-left, 0px));
-          right: calc(10px + env(safe-area-inset-right, 0px));
+          top: 10px;
+          left: 10px;
+          right: 10px;
           max-width: none;
           padding: 16px;
         }
@@ -148,239 +105,13 @@
 
       @media (max-width: 480px) {
         #buttons {
-          bottom: 16px;
-          left: 20px;
-          right: 20px;
-          transform: none;
+          bottom: 20px;
         }
 
         #buttons button {
-          padding: 10px 12px;
+          padding: 14px 16px;
           font-size: 14px;
-          flex: 1 1 calc(50% - 4px);
-        }
-
-        #btn-reset {
-          flex: 1 1 100%;
-        }
-      }
-
-      /* ─── Landscape phone ────────────────────────────────────────────────── */
-      @media (orientation: landscape) and (max-height: 500px) {
-        #instructions-overlay {
-          top: calc(6px + env(safe-area-inset-top, 0px));
-          left: calc(6px + env(safe-area-inset-left, 0px));
-          right: auto;
-          max-width: min(42vw, 260px);
-          max-height: calc(100dvh - 12px);
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          padding: 10px 12px;
-        }
-
-        #instructions-overlay h2 {
-          font-size: 15px;
-        }
-
-        #instructions-overlay p {
-          font-size: 13px;
-          line-height: 1.4;
-        }
-
-        #overlay-header {
-          margin-bottom: 6px;
-        }
-
-        #buttons {
-          bottom: auto;
-          top: 50%;
-          left: auto;
-          right: calc(8px + env(safe-area-inset-right, 0px));
-          transform: translateY(-50%);
-          flex-direction: column;
-          flex-wrap: nowrap;
-          justify-content: flex-start;
-          gap: 6px;
-          width: auto;
-        }
-
-        #buttons button {
-          flex: 0 0 auto;
-          width: 80px;
-          padding: 8px 6px;
-          font-size: 12px;
-        }
-
-        #btn-reset {
-          flex: 0 0 auto;
-          width: 80px;
-        }
-      }
-
-      #loading-overlay {
-        position: fixed;
-        inset: 0;
-        background: #111;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        transition: opacity 0.6s ease;
-      }
-
-      #loading-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      .spinner {
-        width: 52px;
-        height: 52px;
-        border: 4px solid rgba(255,255,255,0.15);
-        border-top-color: #fff;
-        border-radius: 50%;
-        animation: spin 0.9s linear infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-
-      #loading-overlay p {
-        margin-top: 18px;
-        color: rgba(255,255,255,0.7);
-        font-size: 14px;
-        letter-spacing: 0.05em;
-      }
-
-      #zoom-buttons {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        z-index: 100;
-      }
-
-      #zoom-buttons button {
-        width: 44px;
-        height: 44px;
-        border: none;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.25);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        transition: background 0.15s;
-        user-select: none;
-        -webkit-user-select: none;
-      }
-
-      #zoom-buttons button:hover {
-        background: rgba(255, 255, 255, 0.45);
-      }
-
-      #zoom-buttons button:active {
-        background: rgba(255, 255, 255, 0.65);
-      }
-
-      .is-mobile #zoom-buttons {
-        display: none;
-      }
-
-      /* ─── Stats Overlay ──────────────────────────────────────────────────── */
-      #stats-overlay {
-        position: fixed;
-        top: calc(128px + env(safe-area-inset-top, 0px));
-        right: calc(20px + env(safe-area-inset-right, 0px));
-        background: rgba(0, 0, 0, 0.75);
-        color: #fff;
-        padding: 14px 16px;
-        border-radius: 8px;
-        min-width: 170px;
-        z-index: 200;
-        font-family: ui-monospace, Consolas, monospace;
-        font-size: 12px;
-      }
-
-      .is-mobile #stats-overlay {
-        top: calc(10px + env(safe-area-inset-top, 0px));
-        right: calc(10px + env(safe-area-inset-right, 0px));
-      }
-
-      #stats-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-      }
-
-      #stats-overlay h3 {
-        font-size: 13px;
-        font-weight: 600;
-        color: #fff;
-        margin: 0;
-        font-family: system-ui, -apple-system, sans-serif;
-        letter-spacing: 0.02em;
-      }
-
-      #stats-collapse-btn {
-        background: none;
-        border: none;
-        color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
-        font-size: 14px;
-        padding: 0 0 0 12px;
-        line-height: 1;
-        flex-shrink: 0;
-      }
-
-      #stats-collapse-btn:hover {
-        color: #fff;
-      }
-
-      #stats-overlay.collapsed #stats-content {
-        display: none;
-      }
-
-      .stat-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 12px;
-        padding: 3px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      }
-
-      .stat-row:last-child {
-        border-bottom: none;
-      }
-
-      .stat-label {
-        color: rgba(255, 255, 255, 0.55);
-        font-size: 11px;
-        white-space: nowrap;
-      }
-
-      .stat-value {
-        color: #7ccfff;
-        font-weight: 600;
-        font-size: 12px;
-      }
-
-      .stat-value.good { color: #7fe07f; }
-      .stat-value.warn { color: #ffaa33; }
-
-      @media (orientation: landscape) and (max-height: 500px) {
-        #stats-overlay {
-          top: calc(6px + env(safe-area-inset-top, 0px));
-          right: calc(96px + env(safe-area-inset-right, 0px));
-          padding: 8px 12px;
-          min-width: 140px;
+          flex: 1 1 45%;
         }
       }
     </style>
@@ -388,16 +119,9 @@
   <body>
     <!-- <button onclick="playAction('DoorOpen')">Open Door</button>
     <button onclick="playAction('DoorClose')">Close Door</button> -->
-    <div id="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading…</p>
-    </div>
     <div id="container"></div>
     <div id="instructions-overlay">
-      <div id="overlay-header">
-        <h2 id="instruction-heading">Welcome</h2>
-        <button id="collapse-btn" aria-label="Toggle instructions">▼</button>
-      </div>
+      <h2 id="instruction-heading">Welcome</h2>
       <p id="instruction-text">Click any step button below to see product instructions.</p>
     </div>
     <div id="buttons">
@@ -405,61 +129,11 @@
       <button id="btn-2">Step 2</button>
       <button id="btn-3">Step 3</button>
       <button id="btn-4">Step 4</button>
+      <button id="btn-left">Left</button>
+      <button id="btn-middle">Middle</button>
+      <button id="btn-right">Right</button>
       <button id="btn-reset">Reset</button>
     </div>
-    <div id="stats-overlay">
-      <div id="stats-header">
-        <h3>Performance</h3>
-        <button id="stats-collapse-btn" aria-label="Toggle stats">▼</button>
-      </div>
-      <div id="stats-content">
-        <div class="stat-row">
-          <span class="stat-label">FPS</span>
-          <span class="stat-value" id="stat-fps">–</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Frame</span>
-          <span class="stat-value" id="stat-ms">–</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Draw Calls</span>
-          <span class="stat-value" id="stat-calls">–</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Triangles</span>
-          <span class="stat-value" id="stat-tris">–</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Geometries</span>
-          <span class="stat-value" id="stat-geo">–</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Textures</span>
-          <span class="stat-value" id="stat-tex">–</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Programs</span>
-          <span class="stat-value" id="stat-prog">–</span>
-        </div>
-      </div>
-    </div>
-    <div id="zoom-buttons">
-      <button id="btn-zoom-in" aria-label="Zoom in">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="10" cy="10" r="6.5"/>
-          <line x1="15.5" y1="15.5" x2="21" y2="21"/>
-          <line x1="10" y1="7" x2="10" y2="13"/>
-          <line x1="7" y1="10" x2="13" y2="10"/>
-        </svg>
-      </button>
-      <button id="btn-zoom-out" aria-label="Zoom out">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="10" cy="10" r="6.5"/>
-          <line x1="15.5" y1="15.5" x2="21" y2="21"/>
-          <line x1="7" y1="10" x2="13" y2="10"/>
-        </svg>
-      </button>
-    </div>
-    <script type="module" src="src/main.js"></script>
+    <script type="module" src="src/fireTest.js"></script>
   </body>
 </html>
