@@ -55,6 +55,8 @@ function resetAnimations() {
   });
 }
 function animate() {  
+  stats.begin();
+
   timer.update();
 
   const delta = timer.getDelta();
@@ -79,6 +81,8 @@ function animate() {
   if (controls) controls.update();
 
   composer.render();
+
+  stats.end();
 }
 function setTarget(value) {
   targetLerp = value;
