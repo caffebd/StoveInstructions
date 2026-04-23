@@ -16,6 +16,7 @@ import fireMaskTexUrl from '/src/assets/textures/fire.png';
 import fireColorTexUrl from '/src/assets/textures/fire_gradient.png';
 import logsColorTexUrl from '/src/assets/textures/logs_color.png';
 import HDRITexture from '/src/assets/hdri/photo_studio_01_2k.hdr?url';
+import stoveModel from '/src/assets/gltf/stoveWithFire.glb?url';
 
 function playAction(name) {
   const action = actions[name];
@@ -768,7 +769,7 @@ dracoLoader.setDecoderPath('jsm/libs/draco/gltf/');
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 loader.load(
-  'src/assets/gltf/stoveWithFire.glb',
+  stoveModel,
   (gltf) => {
     model = gltf.scene;
     model.position.set(0, 0, 0);
