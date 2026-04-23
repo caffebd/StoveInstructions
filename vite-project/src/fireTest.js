@@ -12,6 +12,10 @@ import { logsVertexShader, logsFragmentShader } from './shaders/logsShader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
+import fireMaskTexUrl from '/src/assets/textures/fire.png';
+import fireColorTexUrl from '/src/assets/textures/fire_gradient.png';
+import logsColorTexUrl from '/src/assets/textures/logs_color.png';
+import HDRITexture from '/src/assets/hdri/photo_studio_01_2k.hdr?url';
 
 function playAction(name) {
   const action = actions[name];
@@ -669,16 +673,16 @@ let model;
 // Texture loader
 const textureLoader = new THREE.TextureLoader();
 
-const fireMaskTex = textureLoader.load('/src/assets/textures/fire.png');
+const fireMaskTex = textureLoader.load(fireMaskTexUrl);
 fireMaskTex.wrapS = THREE.RepeatWrapping;
 fireMaskTex.wrapT = THREE.RepeatWrapping;
 
-const fireColorTex = textureLoader.load('/src/assets/textures/fire_gradient.png');
+const fireColorTex = textureLoader.load(fireColorTexUrl);
 fireColorTex.wrapS = THREE.RepeatWrapping;
 fireColorTex.wrapT = THREE.RepeatWrapping;
 fireColorTex.colorSpace = THREE.SRGBColorSpace;
 
-const logColorTex = textureLoader.load('/src/assets/textures/logs_color.png');
+const logColorTex = textureLoader.load(logsColorTexUrl);
 logColorTex.wrapS = THREE.RepeatWrapping;
 logColorTex.wrapT = THREE.RepeatWrapping;
 logColorTex.colorSpace = THREE.SRGBColorSpace;
@@ -736,7 +740,7 @@ const bloom = new UnrealBloomPass(
 composer.addPass(bloom);
 
 const rgbe = new HDRLoader();
-const envMap = await rgbe.loadAsync('src/assets/hdri/photo_studio_01_2k.hdr' );
+const envMap = await rgbe.loadAsync(HDRITexture);
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 scene.environment = envMap;
 scene.environmentRotation.set(0, 0, 0);
