@@ -12,11 +12,6 @@ import { logsVertexShader, logsFragmentShader } from './shaders/logsShader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
-import fireMaskTexUrl from '/src/assets/textures/fire.png';
-import fireColorTexUrl from '/src/assets/textures/fire_gradient.png';
-import logsColorTexUrl from '/src/assets/textures/logs_color.png';
-import HDRITexture from '/src/assets/hdri/photo_studio_01_2k.hdr?url';
-import stoveModel from '/src/assets/gltf/stoveWithFire.glb?url';
 
 function playAction(name) {
   const action = actions[name];
@@ -674,16 +669,16 @@ let model;
 // Texture loader
 const textureLoader = new THREE.TextureLoader();
 
-const fireMaskTex = textureLoader.load(fireMaskTexUrl);
+const fireMaskTex = textureLoader.load('/assets/textures/fire.png');
 fireMaskTex.wrapS = THREE.RepeatWrapping;
 fireMaskTex.wrapT = THREE.RepeatWrapping;
 
-const fireColorTex = textureLoader.load(fireColorTexUrl);
+const fireColorTex = textureLoader.load('/assets/textures/fire_gradient.png');
 fireColorTex.wrapS = THREE.RepeatWrapping;
 fireColorTex.wrapT = THREE.RepeatWrapping;
 fireColorTex.colorSpace = THREE.SRGBColorSpace;
 
-const logColorTex = textureLoader.load(logsColorTexUrl);
+const logColorTex = textureLoader.load('/assets/textures/logs_color.png');
 logColorTex.wrapS = THREE.RepeatWrapping;
 logColorTex.wrapT = THREE.RepeatWrapping;
 logColorTex.colorSpace = THREE.SRGBColorSpace;
@@ -741,7 +736,7 @@ const bloom = new UnrealBloomPass(
 composer.addPass(bloom);
 
 const rgbe = new HDRLoader();
-const envMap = await rgbe.loadAsync(HDRITexture);
+const envMap = await rgbe.loadAsync('/assets/hdri/photo_studio_01_2k.hdr');
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 scene.environment = envMap;
 scene.environmentRotation.set(0, 0, 0);
@@ -764,12 +759,12 @@ controls.update();
 
 // GLTF Loader
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('jsm/libs/draco/gltf/');
+dracoLoader.setDecoderPath('https://unpkg.com/three@0.184.0/examples/jsm/libs/draco/gltf/');
 
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 loader.load(
-  stoveModel,
+  '/assets/gltf/stoveWithFire.glb',
   (gltf) => {
     model = gltf.scene;
     model.position.set(0, 0, 0);
