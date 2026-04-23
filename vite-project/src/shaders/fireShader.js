@@ -3,6 +3,8 @@ const preamble = /* glsl */`
   ${pbrCommonGLSL}
 
   uniform float TIME;
+  uniform float delta;
+  uniform float firePhase;
 
   uniform sampler2D fireTex;
   uniform sampler2D fireCol;
@@ -156,18 +158,17 @@ ${preamble}
 
 
 void main() {
-
-  vec2 uv = UV;
+	vec2 uv = UV;
 	vec2 noise_uv = uv * mix(0.0, 2.0, noiseScale);
 	noise_uv = rotateUV(noise_uv, mix(-45.0, 45.0, fireDirection), vec2(0.5, 1.0));
-	noise_uv.x += mix(-0.5, 0.5, sin(TIME * 0.5));
-	noise_uv.y += TIME * mix(0.0, 5.0, noiseSpeed);
+	noise_uv.x += mix(-0.5, 0.5, sin(firePhase * 0.5));
+	noise_uv.y += firePhase * mix(0.0, 5.0, noiseSpeed);
 	float noise = texture(fireTex, noise_uv).g;
 
 	vec2 fire_uv = uv * mix(0.1, 1.0, fireSize);
 	fire_uv = rotateUV(fire_uv, mix(-45.0, 45.0, fireDirection), vec2(0.5, 1.0));
-	fire_uv.x += mix(-0.5, 0.5, sin(TIME * 0.2));
-	fire_uv.y += TIME * mix(0.0, 3.0, fireSpeed);
+	fire_uv.x += mix(-0.5, 0.5, sin(firePhase * 0.2));
+	fire_uv.y += firePhase * 3.0;
 
 	fire_uv += (noise * mix(0.0, 0.7, fireWarp));
 
@@ -175,7 +176,7 @@ void main() {
 
 	float fire_mask = max((COLOR.r * vColRAffect), (COLOR.g * vColGAffect));
 	float uv_y_mask = (UV.y * UV_Y_Affect);
-	float flicker_mask = clamp(sin(objectOrigin.x * TIME * mix(0.0, 120.0, fireFlickerSpeed)), 0.0, 1.0);
+	float flicker_mask = clamp(sin(objectOrigin.x * firePhase * mix(0.0, 120.0, fireFlickerSpeed)), 0.0, 1.0);
 
 	float fire_tex = (textures.r * (textures.a * 1.3));
 	fire_tex = clamp(fire_tex, 0.0, 1.0);
@@ -191,11 +192,10 @@ void main() {
 	
 	fire -= clamp((1.0 - fireStability) - noise, 0.0, 1.0) ;
 	fire -= (flicker_mask * fireFlickerAmount);
-	fire = clamp( fire, 0.0, 1.0);
-  
+	fire = clamp(fire, 0.0, 1.0);
 
 	vec3 fire_color = texture(fireCol, vec2(fire, 0.5)).rgb;
-  vec3 emissive = fire_color * 5.0;
+  vec3 emissive = fire_color * 8.0;
 
   vec3 worldPos = vec3(0.0); // Set from vertex shader if needed
   vec3 worldNormal = vec3(0.0, 1.0, 0.0); // Set from vertex shader if needed

@@ -10,6 +10,7 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { fireVertexShader, fireFragmentShader } from './shaders/fireShader.js';
 import { logsVertexShader, logsFragmentShader } from './shaders/logsShader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
 
 function playAction(name) {
@@ -65,6 +66,13 @@ function animate() {
     if (mat.uniforms.TIME) {
       mat.uniforms.TIME.value += delta;
     }
+    if (mat.uniforms.firePhase) {
+      const speedUniform = mat.uniforms.fireSpeed;
+      if (speedUniform && typeof speedUniform.value === 'number') {
+        const currentFireSpeed = speedUniform.value;
+        mat.uniforms.firePhase.value += delta * currentFireSpeed;
+      }
+    }
   });
   
   if (mixer) mixer.update(delta);
@@ -79,7 +87,7 @@ function updateLerp(deltaTime) {
   if (Math.abs(targetLerp - animLerp) < 0.001) return;
 
   const animSpeed = 0.5;
-  const fireSpeed = 0.9;
+  const fireSpeed = 0.5;
 
   animLerp += (targetLerp - animLerp) * animSpeed * deltaTime;
   fireLerp += (targetLerp - fireLerp) * fireSpeed * deltaTime;
@@ -324,24 +332,24 @@ const fireStates = {
     left: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
+      UV_Y_Affect : 1.0,
       fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      fireSpeed : 0.71200003382,
+      fireAmount : 0.8390000398525,
+      fireDensity : 0.382000018145,
+      fireBorderTop : 0.3370000160075,
+      fireBorderBottom : 0.2010000095475,
       fireDirection : 0.5,
       fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
+      fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
+      fireWarp : 0.1110000052725,
+      noiseScale : 0.35200001672,
       noiseSpeed : 0.174000008265,
       worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
+      meshDisplaceRange : 0.02700000128249999,
       meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
+      xDisplaceAmount : 0.1,
       yDisplaceAmount : 0.0,
       zDisplaceAmount : 0.0,
       xOffsetDir : 0.0,
@@ -349,53 +357,53 @@ const fireStates = {
       zOffsetDir : 0.0,
     }),
     middle: new FireState({
+      vColRAffect : 0.4790000227525,
+      vColGAffect : 0.74400003534,
+      UV_Y_Affect : 0.35600001691,
+      fireSize : 0.2370000112575,
+      fireSpeed : 0.2050000097375,
+      fireAmount : 0.834000039615,
+      fireDensity : 0.1890000089775,
+      fireBorderTop : 0.2050000097375,
+      fireBorderBottom : 0.182000008645,
+      fireDirection : 0.5,
+      fireStability : 0.9710000461225,
+      fireFlickerAmount : 0.0,
+      fireFlickerSpeed : 0.5,
+      fireWarp : 0.106000005035,
+      noiseScale : 0.19600000931,
+      noiseSpeed : 0.1130000053675,
+      worldUVScale : 11.575,
+      meshDisplaceRange : 0.1330000063175,
+      meshDisplaceSpeed : 0.2650000125875,
+      xDisplaceAmount : 0.15200000722,
+      yDisplaceAmount : 0.0,
+      zDisplaceAmount : 0.0,
+      xOffsetDir : 0.08500005153750001,
+      yOffsetDir : 0.0,
+      zOffsetDir : -0.10399995744000001,
+    }),
+    right: new FireState({
       vColRAffect : 0.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.0,
-      fireDensity : 0.0,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      vColGAffect : 1.0,
+      UV_Y_Affect : 0.0950000045125,
+      fireSize : 0.5350000254125,
+      fireSpeed : 0.774000036765,
+      fireAmount : 0.8390000398525,
+      fireDensity : 0.2110000100225,
+      fireBorderTop : 0.2230000105925,
+      fireBorderBottom : 0.1770000084075,
       fireDirection : 0.5,
       fireStability : 1.0,
       fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
+      fireWarp : 0.1110000052725,
+      noiseScale : 0.35200001672,
       noiseSpeed : 0.174000008265,
       worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
+      meshDisplaceRange : 0.02700000128249999,
       meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
-    }),
-    right: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
-      fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
-      fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
-      noiseSpeed : 0.174000008265,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
+      xDisplaceAmount : 0.1,
       yDisplaceAmount : 0.0,
       zDisplaceAmount : 0.0,
       xOffsetDir : 0.0,
@@ -407,26 +415,26 @@ const fireStates = {
     left: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      UV_Y_Affect : 0.0,
+      fireSize : 0.4010000190475,
+      fireSpeed : 1.0,
+      fireAmount : 0.0,
+      fireDensity : 0.5,
+      fireBorderTop : 0.166000007885,
+      fireBorderBottom : 0.21600001026,
       fireDirection : 0.5,
       fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
+      fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
-      noiseSpeed : 0.174000008265,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
+      fireWarp : 0.5,
+      noiseScale : 0.5,
+      noiseSpeed : 0.5,
+      worldUVScale : 15.525,
+      meshDisplaceRange : 0.0230000010925,
+      meshDisplaceSpeed : 0.5,
+      xDisplaceAmount : 0.1,
+      yDisplaceAmount : 0.1,
+      zDisplaceAmount : 0.1,
       xOffsetDir : 0.0,
       yOffsetDir : 0.0,
       zOffsetDir : 0.0,
@@ -434,26 +442,26 @@ const fireStates = {
     middle: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      UV_Y_Affect : 0.0,
+      fireSize : 0.4010000190475,
+      fireSpeed : 1.0,
+      fireAmount : 0.0,
+      fireDensity : 0.5,
+      fireBorderTop : 0.166000007885,
+      fireBorderBottom : 0.21600001026,
       fireDirection : 0.5,
       fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
+      fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
-      noiseSpeed : 0.174000008265,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
+      fireWarp : 0.5,
+      noiseScale : 0.5,
+      noiseSpeed : 0.5,
+      worldUVScale : 15.525,
+      meshDisplaceRange : 0.0230000010925,
+      meshDisplaceSpeed : 0.5,
+      xDisplaceAmount : 0.1,
+      yDisplaceAmount : 0.1,
+      zDisplaceAmount : 0.1,
       xOffsetDir : 0.0,
       yOffsetDir : 0.0,
       zOffsetDir : 0.0,
@@ -461,26 +469,26 @@ const fireStates = {
     right: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      UV_Y_Affect : 0.0950000045125,
+      fireSize : 0.4170000198075,
+      fireSpeed : 0.774000036765,
+      fireAmount : 0.8770000416575,
+      fireDensity : 0.2490000118275,
+      fireBorderTop : 0.278000013205,
+      fireBorderBottom : 0.2000000095,
       fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
-      fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
+      fireStability : 0.5600000266,
+      fireFlickerAmount : 0.3330000158175,
+      fireFlickerSpeed : 0.28400001349,
+      fireWarp : 0.20400000969,
+      noiseScale : 0.35200001672,
       noiseSpeed : 0.174000008265,
       worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
+      meshDisplaceRange : 0.050000002375,
+      meshDisplaceSpeed : 1.0,
+      xDisplaceAmount : 0.1050000049875,
+      yDisplaceAmount : 0.194000009215,
+      zDisplaceAmount : 0.10400000494,
       xOffsetDir : 0.0,
       yOffsetDir : 0.0,
       zOffsetDir : 0.0,
@@ -490,20 +498,20 @@ const fireStates = {
     left: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      UV_Y_Affect : 0.0,
+      fireSize : 0.55200002622,
+      fireSpeed : 0.758000036005,
+      fireAmount : 0.4850000230375,
+      fireDensity : 0.0,
+      fireBorderTop : 0.2330000110675,
+      fireBorderBottom : 0.1010000047975,
       fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
+      fireStability : 0.0,
+      fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
-      noiseSpeed : 0.174000008265,
+      fireWarp : 0.12400000589,
+      noiseScale : 0.32400001539,
+      noiseSpeed : 0.26400001254,
       worldUVScale : 11.575,
       meshDisplaceRange : 0.027000001282499998,
       meshDisplaceSpeed : 0.106000005035,
@@ -517,24 +525,24 @@ const fireStates = {
     middle: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      UV_Y_Affect : 0.0,
+      fireSize : 0.3730000177175,
+      fireSpeed : 0.3130000148675,
+      fireAmount : 0.7730000367175,
+      fireDensity : 0.2410000114475,
+      fireBorderTop : 0.3470000164825,
+      fireBorderBottom : 0.22000001045,
       fireDirection : 0.5,
       fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
+      fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
-      noiseSpeed : 0.174000008265,
+      fireWarp : 0.06800000323,
+      noiseScale : 0.35200001672,
+      noiseSpeed : 0.1270000060325,
       worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
+      meshDisplaceRange : 0.02700000128249999,
       meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
+      xDisplaceAmount : 0.1,
       yDisplaceAmount : 0.0,
       zDisplaceAmount : 0.0,
       xOffsetDir : 0.0,
@@ -544,24 +552,24 @@ const fireStates = {
     right: new FireState({
       vColRAffect : 1.0,
       vColGAffect : 0.0,
-      UV_Y_Affect : 0.5590000265525,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.5550000263625,
-      fireAmount : 0.9290000441275,
-      fireDensity : 0.5710000271225,
-      fireBorderTop : 0.4370000207575,
-      fireBorderBottom : 0.2670000126825,
+      UV_Y_Affect : 0.0,
+      fireSize : 0.3730000177175,
+      fireSpeed : 0.61200002907,
+      fireAmount : 0.782000037145,
+      fireDensity : 0.350000016625,
+      fireBorderTop : 0.390000018525,
+      fireBorderBottom : 0.234000011115,
       fireDirection : 0.5,
       fireStability : 1.0,
-      fireFlickerAmount : 0.02800000133,
+      fireFlickerAmount : 0.1090000051775,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.138000006555,
-      noiseScale : 0.3710000176225,
-      noiseSpeed : 0.174000008265,
+      fireWarp : 0.1150000054625,
+      noiseScale : 0.35200001672,
+      noiseSpeed : 0.1270000060325,
       worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
+      meshDisplaceRange : 0.02700000128249999,
       meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
+      xDisplaceAmount : 0.1,
       yDisplaceAmount : 0.0,
       zDisplaceAmount : 0.0,
       xOffsetDir : 0.0,
@@ -606,17 +614,18 @@ const materialsByType = {
   logs: []
 };
 
+const animNames = [
+  // 'stove_top',
+  // 'stove_door',
+  // 'stove_grill',
+  // 'stove_lever',
+  // 'stove_ashpan'      
+];
+
 const actions = {};
 const finishedActions = new Set();
 const customMaterials = [];
 
-const animNames = [
-  'stove_top',
-  'stove_door',
-  'stove_grill',
-  'stove_lever',
-  'stove_ashpan'      
-];
 
 const fireCards = new Set([
   'fire_card_01',
@@ -636,6 +645,10 @@ const fireCylinders = new Set([
   'fire_cylinder_08',
   'fire_cylinder_09',
   'fire_cylinder_10',
+  'fire_cylinder_11',
+  'fire_cylinder_12',
+  'fire_cylinder_13',
+  'fire_cylinder_14',
 ]);
 
 const fireExplosions = new Set([
@@ -681,11 +694,17 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
 camera.position.set(5, 2, 8);
 
+const fireLight = new THREE.PointLight(0xff8d00, 2.0);
+scene.add( fireLight );
+const pointLighthelper = new THREE.PointLightHelper( fireLight, 1);
+// scene.add(pointLighthelper);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
 container.appendChild(renderer.domElement);
 
 const composer = new EffectComposer(renderer);
@@ -703,10 +722,14 @@ const ssrPass = new SSRPass({
 
 // composer.addPass(ssrPass);
 
+const ssaoPass = new SSAOPass(renderer, camera, innerWidth, innerHeight);
+
+// composer.addPass(ssaoPass);
+
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.0,   // intensity
-  0.3,   // radius
+  0.5,   // intensity
+  0.7,   // radius
   0.8    // threshold
 );
 
@@ -717,11 +740,12 @@ const envMap = await rgbe.loadAsync('src/assets/hdri/photo_studio_01_2k.hdr' );
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 scene.environment = envMap;
 scene.environmentRotation.set(0, 0, 0);
-scene.background = envMap;
+scene.background = new THREE.Color(0xe6cdad);
 scene.backgroundBlurriness = 1;
 scene.backgroundIntensity = 0.9;
 scene.environmentIntensity = 0.9;
 
+// Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 0.7, 0);
@@ -822,6 +846,7 @@ loader.load(
 
       if (baseMaterial && materialType) {
         baseMaterial.uniforms.TIME = { value : 0};
+        baseMaterial.uniforms.firePhase = { value : 0};
         baseMaterial.uniforms.fireTex = { value : fireMaskTex};
         baseMaterial.uniforms.fireCol = { value : fireColorTex};
         child.material = baseMaterial;
@@ -857,6 +882,7 @@ loader.load(
 
       if (baseMaterial && materialType) {
         baseMaterial.uniforms.TIME = { value : 0};
+        baseMaterial.uniforms.firePhase = { value : 0};
         baseMaterial.uniforms.logTex = { value : logColorTex};
         baseMaterial.uniforms.noiseTex = { value : fireMaskTex};
         child.material = baseMaterial;
