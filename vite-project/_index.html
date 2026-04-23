@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Scene</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        overflow: hidden;
+        background: #000;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      #container {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #buttons {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+      }
+
+      #buttons button {
+        padding: 12px 24px;
+        font-size: 14px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.9);
+        border: none;
+        border-radius: 8px;
+        transition: background 0.2s;
+      }
+
+      #buttons button:hover {
+        background: rgba(255, 255, 255, 1);
+      }
+
+      #instructions-overlay {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.75);
+        color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 300px;
+        z-index: 200;
+        transition: opacity 0.3s ease;
+      }
+
+      #instructions-overlay h2 {
+        margin-bottom: 10px;
+        font-size: 18px;
+        color: #fff;
+      }
+
+      #instructions-overlay p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: #ccc;
+      }
+
+      @media (max-width: 768px) {
+        #buttons {
+          bottom: 30px;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: center;
+          padding: 0 10px;
+        }
+
+        #buttons button {
+          padding: 16px 20px;
+          font-size: 16px;
+          min-width: 70px;
+        }
+
+        #instructions-overlay {
+          top: 10px;
+          left: 10px;
+          right: 10px;
+          max-width: none;
+          padding: 16px;
+        }
+
+        #instructions-overlay h2 {
+          font-size: 20px;
+        }
+
+        #instructions-overlay p {
+          font-size: 15px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        #buttons {
+          bottom: 20px;
+        }
+
+        #buttons button {
+          padding: 14px 16px;
+          font-size: 14px;
+          flex: 1 1 45%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- <button onclick="playAction('DoorOpen')">Open Door</button>
+    <button onclick="playAction('DoorClose')">Close Door</button> -->
+    <div id="container"></div>
+    <div id="instructions-overlay">
+      <h2 id="instruction-heading">Welcome</h2>
+      <p id="instruction-text">Click any step button below to see product instructions.</p>
+    </div>
+    <div id="buttons">
+      <button id="btn-1">Step 1</button>
+      <button id="btn-2">Step 2</button>
+      <button id="btn-3">Step 3</button>
+      <button id="btn-4">Step 4</button>
+      <button id="btn-left">Left</button>
+      <button id="btn-middle">Middle</button>
+      <button id="btn-right">Right</button>
+      <button id="btn-reset">Reset</button>
+    </div>
+    <script type="module" src="src/fireTest.js"></script>
+  </body>
+</html>

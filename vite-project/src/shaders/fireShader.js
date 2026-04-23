@@ -1,31 +1,63 @@
-// Godot spatial → Three.js ShaderMaterial
-// cull_disabled → material.side = DoubleSide
-// depth_draw_opaque → depthWrite: true
-
+import { pbrCommonGLSL } from './pbrSnippet.js';
 const preamble = /* glsl */`
-  uniform sampler2D fireTex;
+  ${pbrCommonGLSL}
+
   uniform float TIME;
-  uniform vec3 fireCol;
+
+  uniform sampler2D fireTex;
+  uniform sampler2D fireCol;
+  uniform float vColRAffect;
+  uniform float vColGAffect;
+  uniform float UV_Y_Affect;
+  uniform float fireSize;
   uniform float fireSpeed;
   uniform float fireAmount;
   uniform float fireDensity;
   uniform float fireBorderTop;
   uniform float fireBorderBottom;
   uniform float fireDirection;
-  uniform float fireSize;
   uniform float fireStability;
+  uniform float fireFlickerAmount;
+  uniform float fireFlickerSpeed;
+  uniform float fireWarp;
+  uniform float noiseScale;
+  uniform float noiseSpeed;
+  uniform float worldUVScale;
   uniform float meshDisplaceRange;
   uniform float meshDisplaceSpeed;
+  uniform float xDisplaceAmount;
+  uniform float yDisplaceAmount;
+  uniform float zDisplaceAmount;
   uniform float xOffsetDir;
   uniform float yOffsetDir;
   uniform float zOffsetDir;
-  uniform float worldUVScale;
+
+  uniform float metalness;
+  uniform float roughness;
+  uniform float ao;
 
   varying vec2 UV;
   varying vec4 COLOR;
   varying vec3 objectPos;
-  varying vec3 debug;
+  varying vec3 objectOrigin;
 
+  vec3 srgbToLinear(vec3 sRGB) {
+    return mix(
+        sRGB * 0.0773993808,
+        pow(sRGB * 0.9478672986 + 0.0521327014, vec3(2.4)),
+        step(vec3(0.04045), sRGB)
+    );
+  }
+  vec3 linearToSrgb(vec3 c) {
+    return mix(
+        c * 12.92,
+        1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055,
+        step(vec3(0.0031308), c)
+    );
+  }
+  vec3 srgbToLinearCheap(vec3 sRGB) {
+    return pow(sRGB, vec3(2.2));
+  }
   float heightBlend(float h1, float h2, float height_offset, float contrast, float mask){
 	  height_offset = 1.0 - height_offset;
     float add1 = h1 + height_offset;
@@ -70,46 +102,51 @@ const preamble = /* glsl */`
     v *= mat3(vec3(127.1, 311.7, -53.7), vec3(269.5, 183.3, 77.1), vec3(-301.7, 27.3, 215.3));
 	  return (2.0 * fract(fract(v) * 4375.55) -1.0).x;
   }
-`
 
+`
 const vertexShaderSource = /* glsl */ `
 ${preamble}
 
 void main() {
+  // -------------- GLSL Specific ---------------------
   vec3 VERTEX = position;
+  mat4 MODEL_MATRIX = modelMatrix;
   COLOR = color;
-
   UV = uv;
-  objectPos = position;
-  vec3 worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  vec3 origin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  vec2 worldUV = (worldPos.xz / 5.0) * worldUVScale;
-	vec2 vUV = UVPanner(worldUV, TIME, vec2(-1.3, 0.0));
+  // --------------------------------------------------
+  
+  objectPos = VERTEX;
+	vec3 worldPos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	objectOrigin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+	vec2 worldUV = (worldPos.xz / 5.0) * worldUVScale;
+	vec2 vUV = UVPanner(worldUV, TIME, vec2(0.5, 1.3));
 
-  float noise = texture(fireTex, vUV).g;
+	float noise = texture(fireTex, vUV).g;
 
-  float mesh_displace_speed = mix(0.0, 40.0, meshDisplaceSpeed);
-	vec3 random = mix(vec3(-meshDisplaceRange), vec3(meshDisplaceRange), sin(origin * TIME * mesh_displace_speed));
+	float mesh_displace_speed = mix(0.0, 40.0, meshDisplaceSpeed);
+	vec3 random = mix(vec3(-meshDisplaceRange), vec3(meshDisplaceRange), sin(objectOrigin * TIME * mesh_displace_speed));
 	vec3 rand_spots = hashNoise3(worldPos);
 
-	float mask = 1.0 - UV.y;
+	float uv_y_mask = 1.0 - UV.y;
 
-	float offset_x = sin(random.x) * sin(noise) * mask;
-	float offset_z = sin(random.z) * sin(noise) * mask;
+	float offset_x = sin(random.x) * sin(noise) * uv_y_mask;
+	float offset_y = sin(random.y) * sin(noise) * uv_y_mask;
+	float offset_z = sin(random.z) * sin(noise) * uv_y_mask;
 	
-	debug = vec3(rand_spots);
+	
+	objectOrigin;
 
-	vec3 bend_dir = vec3(xOffsetDir, yOffsetDir, zOffsetDir) * mask;
+	vec3 bend_dir = vec3(xOffsetDir, yOffsetDir, zOffsetDir) * uv_y_mask;
 
-  VERTEX.x += offset_x;
-	VERTEX.z += offset_z;
-	VERTEX += bend_dir;
-
-  debug = vec3(vUV.x);
+	VERTEX.x += offset_x * xDisplaceAmount;
+	VERTEX.y += offset_y * yDisplaceAmount * UV.y;;
+	VERTEX.z += offset_z * zDisplaceAmount;
+	VERTEX += sign(bend_dir) * pow(abs(bend_dir), vec3(1.9));
   
-
+  
+  // -------------- GLSL Specific ---------------------
   gl_Position = projectionMatrix * viewMatrix * (modelMatrix * vec4(VERTEX, 1.0));
-
+  // --------------------------------------------------
 
 }
 `;
@@ -121,44 +158,64 @@ ${preamble}
 void main() {
 
   vec2 uv = UV;
+	vec2 noise_uv = uv * mix(0.0, 2.0, noiseScale);
+	noise_uv = rotateUV(noise_uv, mix(-45.0, 45.0, fireDirection), vec2(0.5, 1.0));
+	noise_uv.x += mix(-0.5, 0.5, sin(TIME * 0.5));
+	noise_uv.y += TIME * mix(0.0, 5.0, noiseSpeed);
+	float noise = texture(fireTex, noise_uv).g;
 
 	vec2 fire_uv = uv * mix(0.1, 1.0, fireSize);
-	fire_uv = rotateUV(fire_uv, mix(-45.0, 45.0, fireDirection), vec2(0.5, 0.5));
+	fire_uv = rotateUV(fire_uv, mix(-45.0, 45.0, fireDirection), vec2(0.5, 1.0));
 	fire_uv.x += mix(-0.5, 0.5, sin(TIME * 0.2));
-	fire_uv.y += TIME * mix(0.0, 2.0, fireSpeed);
-	vec2 noise_uv = uv * 1.5;
-	noise_uv.x += mix(-0.7, 0.7, cos(TIME * 0.7));
-	noise_uv.y += TIME * mix(0.0, 5.0, fireSpeed);
+	fire_uv.y += TIME * mix(0.0, 3.0, fireSpeed);
 
-	float noise = texture(fireTex, noise_uv).g;
+	fire_uv += (noise * mix(0.0, 0.7, fireWarp));
 
 	vec4 textures = texture(fireTex, fire_uv);
 
-	float fire_mask = COLOR.r;
+	float fire_mask = max((COLOR.r * vColRAffect), (COLOR.g * vColGAffect));
+	float uv_y_mask = (UV.y * UV_Y_Affect);
+	float flicker_mask = clamp(sin(objectOrigin.x * TIME * mix(0.0, 120.0, fireFlickerSpeed)), 0.0, 1.0);
 
-	float fire_tex = (textures.r * (textures.a * 1.3)) - mix(0.0, 1.0, 1.0 - fireAmount);
-	fire_tex -= ((noise - clamp((fireStability - 0.8), 0.0, 1.0)) * (1.0 - fireStability) + 0.3);
-	float mask = UV.y;
-	float fire = fire_tex;
-	fire += mask;
-	
+	float fire_tex = (textures.r * (textures.a * 1.3));
+	fire_tex = clamp(fire_tex, 0.0, 1.0);
 	float border_top = mix(0.0, 5.0, fireBorderTop);
 	float border_bottom = mix(0.0, 5.0, fireBorderBottom);
-	fire = smoothstep(border_bottom - border_top, border_bottom, fire);
-	fire -= (1.0 - COLOR.r);
+	fire_tex = smoothstep(border_bottom - border_top, border_bottom, fire_tex);
+
+	float fire = heightBlend(
+		0.5, fire_tex,
+		mix(0.0, 0.9, fireAmount),
+		mix(0.0, 0.02, fireDensity),
+		fire_mask * pow(UV.y, mix(0.0, 2.0, UV_Y_Affect)));
+	
+	fire -= clamp((1.0 - fireStability) - noise, 0.0, 1.0) ;
+	fire -= (flicker_mask * fireFlickerAmount);
+	fire = clamp( fire, 0.0, 1.0);
+  
+
+	vec3 fire_color = texture(fireCol, vec2(fire, 0.5)).rgb;
+  vec3 emissive = fire_color * 5.0;
+
+  vec3 worldPos = vec3(0.0); // Set from vertex shader if needed
+  vec3 worldNormal = vec3(0.0, 1.0, 0.0); // Set from vertex shader if needed
+
+  vec3 pbrColor = calculatePBR(
+    fire_color,
+    worldPos,
+    worldNormal,
+    vec3(0.0), // lightDirection - use default
+    vec3(0.0), // lightColor - use default
+    vec3(0.0), // ambientColor - use default
+    metalness,
+    roughness,
+    ao
+  );
 
 
-	fire *= mix(0.0, 5.0, fireDensity);
-	fire = clamp(fire, 0.0, 1.0);
-
-	// vec3 fire_color = texture(fireCol, vec2(fire, 0.5)).rgb;
-  vec3 fire_color = fireCol * fire;
-  // fire_color = clamp(fire_color, 0.0, 1.0);
-  // vec3 fire_emissive = fire_color * 2.0;
-
-  gl_FragColor = vec4(fire_color * 4.0, fire);
+  gl_FragColor = vec4(pbrColor + emissive, fire);
 }
 `;
 
-export const vertexShader = vertexShaderSource;
-export const fragmentShader = fragmentShaderSource;
+export const fireVertexShader = vertexShaderSource;
+export const fireFragmentShader = fragmentShaderSource;

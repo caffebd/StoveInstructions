@@ -73,7 +73,8 @@ vec3 calculatePBR(
   vec3 ambientTerm = ambient * albedo * safeAO;
 
   vec3 color = ambientTerm + Lo;
-  color = color / (color + vec3(1.0));
-  return pow(color, vec3(1.0 / 2.2));
+  // color = color / (color + vec3(1.0));
+  // return pow(color, vec3(1.0 / 2.2));
+  return color;
 }
 `;
