@@ -689,9 +689,12 @@ timer.connect(document);
 
 const container = document.getElementById('container');
 
+const stats = new Stats();
+container.appendChild(stats.dom);
+
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
 camera.position.set(5, 2, 8);
 
 const fireLight = new THREE.PointLight(0xff8d00, 2.0);
