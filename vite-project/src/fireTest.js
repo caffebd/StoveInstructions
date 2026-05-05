@@ -7,16 +7,22 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
-import { fireVertexShader, fireFragmentShader } from './shaders/fireShader.js';
-import { logsVertexShader, logsFragmentShader } from './shaders/logsShader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
+import { fireVertexShader, fireFragmentShader } from './shaders/fireShader.js';
+import { logVertexShader, logFragmentShader } from './shaders/logShader.js';
+import { stoveBodyVertexShader, stoveBodyFragmentShader } from './shaders/stoveBodyShader.js';
+import { metalVertexShader, metalFragmentShader } from './shaders/metalShader.js';
+import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js';
+import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
+import CustomShaderMaterial from "three-custom-shader-material/vanilla";
+
 
 function playAction(name) {
   const action = actions[name];
   if (!action) {
-    console.warn(`Animation "${name}" not found. Available:`, Object.keys(actions));
+    // console.warn(`Animation "${name}" not found. Available:`, Object.keys(actions));
     return;
   }
   action.reset().play();
@@ -25,7 +31,7 @@ function playAction(name) {
 function playActionLerp(name, t) {
   const action = actions[name];
   if (!action) {
-    console.warn(`Animation "${name}" not found, Available:`, Object.keys(actions));
+    // console.warn(`Animation "${name}" not found, Available:`, Object.keys(actions));
     return;
   }
 
@@ -62,20 +68,41 @@ function animate() {
   const delta = timer.getDelta();
 
   updateLerp(delta);
+
+  const wood_burning = fireLerp < 0.5;
+  const explosions_burning = fireLerp < 0.75;
+  const coal_burning = fireLerp > 0.5;
+
+  for (const m of woodFireMeshObjects) m.visible = wood_burning;
+  for (const m of explosionsMeshObjects) m.visible = explosions_burning;
+  for (const m of coalFireMeshObjects) m.visible = coal_burning;
     
 
-  customMaterials.forEach(mat => {
-    if (mat.uniforms.TIME) {
-      mat.uniforms.TIME.value += delta;
-    }
-    if (mat.uniforms.firePhase) {
-      const speedUniform = mat.uniforms.fireSpeed;
-      if (speedUniform && typeof speedUniform.value === 'number') {
-        const currentFireSpeed = speedUniform.value;
-        mat.uniforms.firePhase.value += delta * currentFireSpeed;
-      }
-    }
-  });
+customMaterials.forEach(mat => {
+  if (mat.uniforms.TIME) {
+    mat.uniforms.TIME.value += delta;
+  }
+
+  const integrate = (phaseName, speedName, minSpeed = 0.0, maxSpeed = 3.0) => {
+    const phaseU = mat.uniforms[phaseName];
+    const speedU = mat.uniforms[speedName];
+    if (!phaseU || !speedU) return;
+
+    const t = Number(speedU.value);           // expected 0..1 blend
+    if (!Number.isFinite(t)) return;
+
+    const speed = minSpeed + (maxSpeed - minSpeed) * t; // lerp
+    phaseU.value += delta * speed;
+  };
+
+  // one accumulator per effect
+  integrate("gradientSpeedDelta",  "gradientSpeed",  0.0, 1.0);
+  integrate("vtxNoiseSpeedDelta",  "vtxNoiseSpeed",  0.0, 1.0);
+  integrate("fireSpeedDelta",  "fireSpeed",  0.0, 3.0);
+  integrate("fireSpeedHDelta",  "fireSpeedH",  0.0, 3.0);
+  integrate("fireFlickerSpeedDelta",  "fireFlickerSpeed",  0.0, 20.0);
+  integrate("noiseSpeedDelta",  "noiseSpeed",  0.0, 3.0);
+});
   
   if (mixer) mixer.update(delta);
   if (controls) controls.update();
@@ -96,11 +123,13 @@ function updateLerp(deltaTime) {
   animLerp += (targetLerp - animLerp) * animSpeed * deltaTime;
   fireLerp += (targetLerp - fireLerp) * fireSpeed * deltaTime;
 
-  // Update each material type with its own blended state
   updateFireMaterialType('cards', materialsByType.cards);
   updateFireMaterialType('cylinders', materialsByType.cylinders);
   updateFireMaterialType('explosions', materialsByType.explosions);
-  updateLogMaterialType('logs', materialsByType.logs);
+  updateLogMaterialType('log', materialsByType.log);
+  updateLogMaterialType('coal', materialsByType.coal);
+  updateLogMaterialType('ember_bed', materialsByType.ember_bed);
+  updateStoveMaterialType('stove_insulation', materialsByType.stove);
 
   playActionLerp('stove_lever', animLerp);
 }
@@ -108,43 +137,56 @@ function updateFireMaterialType(type, materials) {
   if (materials.length === 0) return;
 
   const states = fireStates[type];
-  const blended = lerpThreeFireStates(states.left, states.middle, states.right, fireLerp);
+  const blended = lerpFiveFireStates(states.left, states.left_middle, states.middle, states.right_middle, states.right, fireLerp);
 
   materials.forEach(mat => {
-    mat.uniforms.vColRAffect.value = blended.vColRAffect;
-    mat.uniforms.vColGAffect.value = blended.vColGAffect;
-    mat.uniforms.UV_Y_Affect.value = blended.UV_Y_Affect;
+    mat.uniforms.gradientScaling.value = blended.gradientScaling;
+    mat.uniforms.gradientSpeed.value = blended.gradientSpeed;
+    mat.uniforms.vtxNoiseScaling.value = blended.vtxNoiseScaling;
+    mat.uniforms.vtxNoiseSpeed.value = blended.vtxNoiseSpeed;
+    mat.uniforms.vtxNoiseWarp.value = blended.vtxNoiseWarp;
+
+    mat.uniforms.rotation.value = blended.rotation;
+    mat.uniforms.rotationRandom.value = blended.rotationRandom;
+    mat.uniforms.rotationUVPow.value = blended.rotationUVPow;
+    mat.uniforms.rotationAffect.value = blended.rotationAffect;
+    mat.uniforms.rotationWorld.value = blended.rotationWorld;
+    mat.uniforms.rotationWorldRandom.value = blended.rotationWorldRandom;
+    mat.uniforms.rotationWorldUVPow.value = blended.rotationWorldUVPow;
+    mat.uniforms.rotationWorldAffect.value = blended.rotationWorldAffect;
+
+    mat.uniforms.offset.value = blended.offset;
+    mat.uniforms.offsetRandom.value = blended.offsetRandom;
+    mat.uniforms.offsetUVPow.value = blended.offsetUVPow;
+    mat.uniforms.offsetAffect.value = blended.offsetAffect;
+
+    mat.uniforms.UV_Y_Sub.value = blended.UV_Y_Sub;
+    mat.uniforms.UV_Y_Add.value = blended.UV_Y_Add;
+
     mat.uniforms.fireSize.value = blended.fireSize;
+    mat.uniforms.fireSizeVertical.value = blended.fireSizeVertical;
     mat.uniforms.fireSpeed.value = blended.fireSpeed;
+    mat.uniforms.fireSpeedHorizontal.value = blended.fireSpeedHorizontal;
     mat.uniforms.fireAmount.value = blended.fireAmount;
     mat.uniforms.fireDensity.value = blended.fireDensity;
+
     mat.uniforms.fireBorderTop.value = blended.fireBorderTop;
     mat.uniforms.fireBorderBottom.value = blended.fireBorderBottom;
-    mat.uniforms.fireDirection.value = blended.fireDirection;
-    mat.uniforms.fireStability.value = blended.fireStability;
     mat.uniforms.fireFlickerAmount.value = blended.fireFlickerAmount;
     mat.uniforms.fireFlickerSpeed.value = blended.fireFlickerSpeed;
     mat.uniforms.fireWarp.value = blended.fireWarp;
     mat.uniforms.noiseScale.value = blended.noiseScale;
     mat.uniforms.noiseSpeed.value = blended.noiseSpeed;
-    mat.uniforms.worldUVScale.value = blended.worldUVScale;
-    mat.uniforms.meshDisplaceRange.value = blended.meshDisplaceRange;
-    mat.uniforms.meshDisplaceSpeed.value = blended.meshDisplaceSpeed;
-    mat.uniforms.xDisplaceAmount.value = blended.xDisplaceAmount;
-    mat.uniforms.yDisplaceAmount.value = blended.yDisplaceAmount;
-    mat.uniforms.zDisplaceAmount.value = blended.zDisplaceAmount;
-    mat.uniforms.xOffsetDir.value = blended.xOffsetDir;
-    mat.uniforms.yOffsetDir.value = blended.yOffsetDir;
-    mat.uniforms.zOffsetDir.value = blended.zOffsetDir;
   });
 }
 function updateLogMaterialType(type, materials) {
   if (materials.length === 0) return;
 
   const states = logStates[type];
-  const blended = lerpThreeLogStates(states.left, states.middle, states.right, fireLerp);
+  const blended = lerpFiveLogStates(states.left, states.left_middle, states.middle, states.right_middle, states.right, fireLerp);
 
   materials.forEach(mat => {
+    mat.uniforms.logCoal.value = blended.logCoal;
     mat.uniforms.burnCol.value = blended.burnCol;
     mat.uniforms.glowCol.value = blended.glowCol;
     mat.uniforms.burnAmount.value = blended.burnAmount;
@@ -153,47 +195,109 @@ function updateLogMaterialType(type, materials) {
     mat.uniforms.glowStrength.value = blended.glowStrength;
   });
 }
+function updateStoveMaterialType(type, materials) {
+  if (materials.length === 0) return;
+
+  const states = stoveStates[type];
+  const blended = lerpFiveStoveStates(states.left, states.left_middle, states.middle, states.right_middle, states.right, fireLerp);
+
+  materials.forEach(mat => {
+    mat.uniforms.lightCol.value = blended.lightCol;
+    mat.uniforms.lightStrength.value = blended.lightStrength;
+    mat.uniforms.lightPos.value = blended.lightPos;
+    mat.uniforms.lightRange.value = blended.lightRange;
+    mat.uniforms.lightFalloff.value = blended.lightFalloff;
+    mat.uniforms.stoveColA.value = blended.stoveColA;
+    mat.uniforms.stoveColB.value = blended.stoveColB;
+    mat.uniforms.stoveRoughA.value = blended.stoveRoughA;
+    mat.uniforms.stoveRoughB.value = blended.stoveRoughB;
+  });
+}
 function lerp(a, b, t) {
   return a * (1 - t) + b * t;
 }
+
 function lerpFireState(a, b, t) {
   const result = new FireState();
 
-  result.vColRAffect = lerp(a.vColRAffect, b.vColRAffect, t);
-  result.vColGAffect = lerp(a.vColGAffect, b.vColGAffect, t);
-  result.UV_Y_Affect = lerp(a.UV_Y_Affect, b.UV_Y_Affect, t);
+  result.gradientScaling = lerp(a.gradientScaling, b.gradientScaling, t);
+  result.gradientSpeed = lerp(a.gradientSpeed, b.gradientSpeed, t);
+  result.vtxNoiseScaling = lerp(a.vtxNoiseScaling, b.vtxNoiseScaling, t);
+  result.vtxNoiseSpeed = lerp(a.vtxNoiseSpeed, b.vtxNoiseSpeed, t);
+  result.vtxNoiseWarp = lerp(a.vtxNoiseWarp, b.vtxNoiseWarp, t);
+
+  result.rotation = new THREE.Vector3(
+  lerp(a.rotation.x, b.rotation.x, t),
+  lerp(a.rotation.y, b.rotation.y, t),
+  lerp(a.rotation.z, b.rotation.z, t)
+  );
+
+  result.rotationRandom = new THREE.Vector3(
+  lerp(a.rotationRandom.x, b.rotationRandom.x, t),
+  lerp(a.rotationRandom.y, b.rotationRandom.y, t),
+  lerp(a.rotationRandom.z, b.rotationRandom.z, t)
+  );
+
+  result.rotationUVPow = lerp(a.rotationUVPow, b.rotationUVPow, t);
+  result.rotationAffect = lerp(a.rotationAffect, b.rotationAffect, t);
+  
+  
+  result.rotationWorld = new THREE.Vector3(
+  lerp(a.rotationWorld.x, b.rotationWorld.x, t),
+  lerp(a.rotationWorld.y, b.rotationWorld.y, t),
+  lerp(a.rotationWorld.z, b.rotationWorld.z, t)
+  );
+  
+  result.rotationWorldRandom = new THREE.Vector3(
+  lerp(a.rotationWorldRandom.x, b.rotationWorldRandom.x, t),
+  lerp(a.rotationWorldRandom.y, b.rotationWorldRandom.y, t),
+  lerp(a.rotationWorldRandom.z, b.rotationWorldRandom.z, t)
+  );
+
+  result.rotationWorldUVPow = lerp(a.rotationWorldUVPow, b.rotationWorldUVPow, t);
+  result.rotationWorldAffect = lerp(a.rotationWorldAffect, b.rotationWorldAffect, t);
+
+  result.offset = new THREE.Vector3(
+  lerp(a.offset.x, b.offset.x, t),
+  lerp(a.offset.y, b.offset.y, t),
+  lerp(a.offset.z, b.offset.z, t)
+  );
+
+  result.offsetRandom = new THREE.Vector3(
+  lerp(a.offsetRandom.x, b.offsetRandom.x, t),
+  lerp(a.offsetRandom.y, b.offsetRandom.y, t),
+  lerp(a.offsetRandom.z, b.offsetRandom.z, t)
+  );
+
+  result.offsetUVPow = lerp(a.offsetUVPow, b.offsetUVPow, t);
+  result.offsetAffect = lerp(a.offsetAffect, b.offsetAffect, t);
+
+  result.UV_Y_Sub = lerp(a.UV_Y_Sub, b.UV_Y_Sub, t);
+  result.UV_Y_Add = lerp(a.UV_Y_Add, b.UV_Y_Add, t);
+
   result.fireSize = lerp(a.fireSize, b.fireSize, t);
+  result.fireSizeVertical = lerp(a.fireSizeVertical, b.fireSizeVertical, t);
   result.fireSpeed = lerp(a.fireSpeed, b.fireSpeed, t);
+  result.fireSpeedHorizontal = lerp(a.fireSpeedHorizontal, b.fireSpeedHorizontal, t);
   result.fireAmount = lerp(a.fireAmount, b.fireAmount, t);
   result.fireDensity = lerp(a.fireDensity, b.fireDensity, t);
+
   result.fireBorderTop = lerp(a.fireBorderTop, b.fireBorderTop, t);
   result.fireBorderBottom = lerp(a.fireBorderBottom, b.fireBorderBottom, t);
-  result.fireDirection = lerp(a.fireDirection, b.fireDirection, t);
-  result.fireStability = lerp(a.fireStability, b.fireStability, t);
   result.fireFlickerAmount = lerp(a.fireFlickerAmount, b.fireFlickerAmount, t);
   result.fireFlickerSpeed = lerp(a.fireFlickerSpeed, b.fireFlickerSpeed, t);
   result.fireWarp = lerp(a.fireWarp, b.fireWarp, t);
-
   result.noiseScale = lerp(a.noiseScale, b.noiseScale, t);
   result.noiseSpeed = lerp(a.noiseSpeed, b.noiseSpeed, t);
-  result.worldUVScale = lerp(a.worldUVScale, b.worldUVScale, t);
-  result.meshDisplaceRange = lerp(a.meshDisplaceRange, b.meshDisplaceRange, t);
-  result.meshDisplaceSpeed = lerp(a.meshDisplaceSpeed, b.meshDisplaceSpeed, t);
-  result.xDisplaceAmount = lerp(a.xDisplaceAmount, b.xDisplaceAmount, t);
-
-  result.yDisplaceAmount = lerp(a.yDisplaceAmount, b.yDisplaceAmount, t);
-  result.zDisplaceAmount = lerp(a.zDisplaceAmount, b.zDisplaceAmount, t);
-  result.xOffsetDir = lerp(a.xOffsetDir, b.xOffsetDir, t);
-  result.yOffsetDir = lerp(a.yOffsetDir, b.yOffsetDir, t);
-  result.zOffsetDir = lerp(a.zOffsetDir, b.zOffsetDir, t);
 
   return result;
 }
 function lerpLogState(a, b, t) {
   const result = new LogState();
 
-  result.burnCol = [lerp(a.burnCol[0], b.burnCol[0], t), lerp(a.burnCol[1], b.burnCol[1], t), lerp(a.burnCol[2], b.burnCol[2], t)];
-  result.glowCol = [lerp(a.glowCol[0], b.glowCol[0], t), lerp(a.glowCol[1], b.glowCol[1], t), lerp(a.glowCol[2], b.glowCol[2], t)];
+  result.logCoal = lerp(a.logCoal, b.logCoal, t);
+  result.burnCol = a.burnCol.clone().lerp(b.burnCol, t);
+  result.glowCol = a.glowCol.clone().lerp(b.glowCol, t);
   result.burnAmount = lerp(a.burnAmount, b.burnAmount, t);
   result.burnStrength = lerp(a.burnStrength, b.burnStrength, t);
   result.glowAmount = lerp(a.glowAmount, b.glowAmount, t);
@@ -201,6 +305,26 @@ function lerpLogState(a, b, t) {
 
   return result;
 }
+function lerpStoveState(a, b, t) {
+  const result = new StoveState();
+
+  result.lightCol = a.lightCol.clone().lerp(b.lightCol, t);
+  result.lightStrength = lerp(a.lightStrength, b.lightStrength, t);
+  result.lightPos = new THREE.Vector3(
+    lerp(a.lightPos.x, b.lightPos.x, t),
+    lerp(a.lightPos.y, b.lightPos.y, t),
+    lerp(a.lightPos.z, b.lightPos.z, t)
+  );
+  result.lightRange = lerp(a.lightRange, b.lightRange, t);
+  result.lightFalloff = lerp(a.lightFalloff, b.lightFalloff, t);
+  result.stoveColA = a.stoveColA.clone().lerp(b.stoveColA, t);
+  result.stoveColB = a.stoveColB.clone().lerp(b.stoveColB, t);
+  result.stoveRoughA = lerp(a.stoveRoughA, b.stoveRoughA, t);
+  result.stoveRoughB = lerp(a.stoveRoughB, b.stoveRoughB, t);
+
+  return result;
+}
+
 function lerpThreeFireStates(left, middle, right, t) {
   if (t <= 0.5) {
     const localT = t * 2.0;
@@ -210,6 +334,18 @@ function lerpThreeFireStates(left, middle, right, t) {
     return lerpFireState(middle, right, localT);
   }
 }
+function lerpFiveFireStates(s0, s1, s2, s3, s4, t) {
+  if (t <= 0.25) {
+    return lerpFireState(s0, s1, t * 4.0);
+  } else if (t <= 0.5) {
+    return lerpFireState(s1, s2, (t - 0.25) * 4.0);
+  } else if (t <= 0.75) {
+    return lerpFireState(s2, s3, (t - 0.5) * 4.0);
+  } else {
+    return lerpFireState(s3, s4, (t - 0.75) * 4.0);
+  }
+}
+
 function lerpThreeLogStates(left, middle, right, t) {
   if (t <= 0.5) {
     const localT = t * 2.0;
@@ -219,110 +355,78 @@ function lerpThreeLogStates(left, middle, right, t) {
     return lerpLogState(middle, right, localT);
   }
 }
-class FireState {
-  constructor({
-    vColRAffect = 1.0,
-    vColGAffect = 0.0,
-    UV_Y_Affect = 0.5590000265525,
-    fireSize = 0.6350000301625,
-    fireSpeed = 0.5550000263625,
-    fireAmount = 0.9290000441275,
-    fireDensity = 0.5710000271225,
-    fireBorderTop = 0.4370000207575,
-    fireBorderBottom = 0.2670000126825,
-    fireDirection = 0.5,
-    fireStability = 1.0,
-    fireFlickerAmount = 0.02800000133,
-    fireFlickerSpeed = 0.5,
-    fireWarp = 0.138000006555,
-    noiseScale = 0.3710000176225,
-    noiseSpeed = 0.174000008265,
-    worldUVScale = 11.575,
-    meshDisplaceRange = 0.027000001282499998,
-    meshDisplaceSpeed = 0.106000005035,
-    xDisplaceAmount = 1.0,
-    yDisplaceAmount = 0.0,
-    zDisplaceAmount = 0.0,
-    xOffsetDir = 0.0,
-    yOffsetDir = 0.0,
-    zOffsetDir = 0.0,
-  } = {}) {
-    this.vColRAffect = vColRAffect;
-    this.vColGAffect = vColGAffect;
-    this.UV_Y_Affect = UV_Y_Affect;
-    this.fireSize = fireSize;
-    this.fireSpeed = fireSpeed;
-    this.fireAmount = fireAmount;
-    this.fireDensity = fireDensity;
-    this.fireBorderTop = fireBorderTop;
-    this.fireBorderBottom = fireBorderBottom;
-    this.fireDirection = fireDirection;
-    this.fireStability = fireStability;
-    this.fireFlickerAmount = fireFlickerAmount;
-    this.fireFlickerSpeed = fireFlickerSpeed;
-    this.fireWarp = fireWarp;
-    this.noiseScale = noiseScale;
-    this.noiseSpeed = noiseSpeed;
-    this.worldUVScale = worldUVScale;
-    this.meshDisplaceRange = meshDisplaceRange;
-    this.meshDisplaceSpeed = meshDisplaceSpeed;
-    this.xDisplaceAmount = xDisplaceAmount;
-    this.yDisplaceAmount = yDisplaceAmount;
-    this.zDisplaceAmount = zDisplaceAmount;
-    this.xOffsetDir = xOffsetDir;
-    this.yOffsetDir = yOffsetDir;
-    this.zOffsetDir = zOffsetDir;
+function lerpFiveLogStates(s0, s1, s2, s3, s4, t) {
+  if (t <= 0.25) {
+    return lerpLogState(s0, s1, t * 4.0);
+  } else if (t <= 0.5) {
+    return lerpLogState(s1, s2, (t - 0.25) * 4.0);
+  } else if (t <= 0.75) {
+    return lerpLogState(s2, s3, (t - 0.5) * 4.0);
+  } else {
+    return lerpLogState(s3, s4, (t - 0.75) * 4.0);
   }
 }
-class LogState {
-  constructor({
-    burnCol = [0.18777841, 0.17290697, 0.12215609],
-    glowCol = [1, 0.18039216, 0],
-    burnAmount = 0.6550000311125,
-    burnStrength = 0.2000000095,
-    glowAmount = 0.754000035815,
-    glowStrength = 0.1150000054625,
-  } = {}) {
-    this.burnCol = burnCol;
-    this.glowCol = glowCol;
-    this.burnAmount = burnAmount;
-    this.burnStrength = burnStrength;
-    this.glowAmount = glowAmount;
-    this.glowStrength = glowStrength;
+
+function lerpThreeStoveStates(left, middle, right, t) {
+  if (t <= 0.5) {
+    const localT = t * 2.0;
+    return lerpStoveState(left, middle, localT);
+  } else {
+    const localT = (t - 0.5) * 2.0;
+    return lerpStoveState(middle, right, localT);
   }
 }
+function lerpFiveStoveStates(s0, s1, s2, s3, s4, t) {
+  if (t <= 0.25) {
+    return lerpStoveState(s0, s1, t * 4.0);
+  } else if (t <= 0.5) {
+    return lerpStoveState(s1, s2, (t - 0.25) * 4.0);
+  } else if (t <= 0.75) {
+    return lerpStoveState(s2, s3, (t - 0.5) * 4.0);
+  } else {
+    return lerpStoveState(s3, s4, (t - 0.75) * 4.0);
+  }
+}
+
 function buildFireUniforms(state) {
   return {
-    vColRAffect: { value: state.vColRAffect },
-    vColGAffect: { value: state.vColGAffect },
-    UV_Y_Affect: { value: state.UV_Y_Affect },
+    gradientScaling: { value: state.gradientScaling },
+    gradientSpeed: { value: state.gradientSpeed },
+    vtxNoiseScaling: { value: state.vtxNoiseScaling },
+    vtxNoiseSpeed: { value: state.vtxNoiseSpeed },
+    vtxNoiseWarp: { value: state.vtxNoiseWarp },
+    rotation: { value: state.rotation },
+    rotationRandom: { value: state.rotationRandom },
+    rotationUVPow: { value: state.rotationUVPow },
+    rotationAffect: { value: state.rotationAffect },
+    rotationWorld: { value: state.rotationWorld },
+    rotationWorldRandom: { value: state.rotationWorldRandom },
+    rotationWorldUVPow: { value: state.rotationWorldUVPow },
+    rotationWorldAffect: { value: state.rotationWorldAffect },
+    offset: { value: state.offset },
+    offsetRandom: { value: state.offsetRandom },
+    offsetUVPow: { value: state.offsetUVPow },
+    offsetAffect: { value: state.offsetAffect },
+    UV_Y_Sub: { value: state.UV_Y_Sub },
+    UV_Y_Add: { value: state.UV_Y_Add },
     fireSize: { value: state.fireSize },
+    fireSizeVertical: { value: state.fireSizeVertical },
     fireSpeed: { value: state.fireSpeed },
+    fireSpeedHorizontal: { value: state.fireSpeedHorizontal },
     fireAmount: { value: state.fireAmount },
     fireDensity: { value: state.fireDensity },
     fireBorderTop: { value: state.fireBorderTop },
     fireBorderBottom: { value: state.fireBorderBottom },
-    fireDirection: { value: state.fireDirection },
-    fireStability: { value: state.fireStability },
     fireFlickerAmount: { value: state.fireFlickerAmount },
     fireFlickerSpeed: { value: state.fireFlickerSpeed },
     fireWarp: { value: state.fireWarp },
-
     noiseScale: { value: state.noiseScale },
     noiseSpeed: { value: state.noiseSpeed },
-    worldUVScale: { value: state.worldUVScale },
-    meshDisplaceRange: { value: state.meshDisplaceRange },
-    meshDisplaceSpeed: { value: state.meshDisplaceSpeed },
-    xDisplaceAmount: { value: state.xDisplaceAmount },
-    yDisplaceAmount: { value: state.yDisplaceAmount },
-    zDisplaceAmount: { value: state.zDisplaceAmount },
-    xOffsetDir: { value: state.xOffsetDir },
-    yOffsetDir: { value: state.yOffsetDir },
-    zOffsetDir: { value: state.zOffsetDir },
   };
 }
 function buildLogUniforms(state) {
   return {
+    logCoal: { value: state.logCoal},
     burnCol: { value: state.burnCol },
     glowCol: { value: state.glowCol },
     burnAmount: { value: state.burnAmount },
@@ -331,283 +435,902 @@ function buildLogUniforms(state) {
     glowStrength: { value: state.glowStrength },
   };
 }
+function buildStoveUniforms(state) {
+  return {
+    lightCol: { value: state.lightCol },
+    lightStrength: { value: state.lightStrength },
+    lightPos: { value: state.lightPos },
+    lightRange: { value: state.lightRange },
+    lightFalloff: { value: state.lightFalloff },
+    stoveColA: { value: state.stoveColA },
+    stoveColB: { value: state.stoveColB },
+    stoveRoughA: { value: state.stoveRoughA },
+    stoveRoughB: { value: state.stoveRoughB },
+  };
+}
+class FireState {
+  constructor({
+    gradientScaling = 0.0,
+    gradientSpeed = 0.0,
+    vtxNoiseScaling = 0.0,
+    vtxNoiseSpeed = 0.0,
+    vtxNoiseWarp = 0.0,
+
+    rotation = new THREE.Vector3(0.0, 0.0, 0.0),
+    rotationRandom = new THREE.Vector3(0.0, 0.0, 0.0),
+    rotationUVPow = 0.0,
+    rotationAffect = 0.0,
+    rotationWorld = new THREE.Vector3(0.0, 0.0, 0.0),
+    rotationWorldRandom = new THREE.Vector3(0.0, 0.0, 0.0),
+    rotationWorldUVPow = 0.0,
+    rotationWorldAffect = 0.0,
+
+    offset = new THREE.Vector3(0.0, 0.0, 0.0),
+    offsetRandom = new THREE.Vector3(0.0, 0.0, 0.0),
+    offsetUVPow = 0.0,
+    offsetAffect = 0.0,
+
+    UV_Y_Sub = 0.0,
+    UV_Y_Add = 0.0,
+
+    fireSize = 0.0,
+    fireSizeVertical = 0.0,
+    fireSpeed = 0.0,
+    fireSpeedHorizontal = 0.0,
+    fireAmount = 0.0,
+    fireDensity = 0.0,
+
+    fireBorderTop = 0.0,
+    fireBorderBottom = 0.0,
+    fireFlickerAmount = 0.0,
+    fireFlickerSpeed = 0.0,
+    fireWarp = 0.0,
+    noiseScale = 0.0,
+    noiseSpeed = 0.0,
+  } = {}) {
+    this.gradientScaling = gradientScaling;
+    this.gradientSpeed = gradientSpeed;
+    this.vtxNoiseScaling = vtxNoiseScaling;
+    this.vtxNoiseSpeed = vtxNoiseSpeed;
+    this.vtxNoiseWarp = vtxNoiseWarp;
+    this.rotation = rotation;
+    this.rotationRandom = rotationRandom;
+    this.rotationUVPow = rotationUVPow;
+    this.rotationAffect = rotationAffect;
+    this.rotationWorld = rotationWorld;
+    this.rotationWorldRandom = rotationWorldRandom;
+    this.rotationWorldUVPow = rotationWorldUVPow;
+    this.rotationWorldAffect = rotationWorldAffect;
+    this.offset = offset;
+    this.offsetRandom = offsetRandom;
+    this.offsetUVPow = offsetUVPow;
+    this.offsetAffect = offsetAffect;
+    this.UV_Y_Sub = UV_Y_Sub;
+    this.UV_Y_Add = UV_Y_Add;
+    this.fireSize = fireSize;
+    this.fireSizeVertical = fireSizeVertical;
+    this.fireSpeed = fireSpeed;
+    this.fireSpeedHorizontal = fireSpeedHorizontal;
+    this.fireAmount = fireAmount;
+    this.fireDensity = fireDensity;
+    this.fireBorderTop = fireBorderTop;
+    this.fireBorderBottom = fireBorderBottom;
+    this.fireFlickerAmount = fireFlickerAmount;
+    this.fireFlickerSpeed = fireFlickerSpeed;
+    this.fireWarp = fireWarp;
+    this.noiseScale = noiseScale;
+    this.noiseSpeed = noiseSpeed;
+  }
+}
+class LogState {
+  constructor({
+    logCoal = 0.0,
+    ashAmount = 0.0,
+    ashStrength = 0.0,
+    burnCol = new THREE.Color('#ffffff'),
+    glowCol = new THREE.Color('#ffffff'),
+    burnAmount = 0.6550000311125,
+    burnStrength = 0.2000000095,
+    glowAmount = 0.754000035815,
+    glowStrength = 0.1150000054625,
+  } = {}) {
+    this.logCoal = logCoal;
+    this.ashAmount = ashAmount;
+    this.ashStrength = ashStrength;
+    this.burnCol = burnCol;
+    this.glowCol = glowCol;
+    this.burnAmount = burnAmount;
+    this.burnStrength = burnStrength;
+    this.glowAmount = glowAmount;
+    this.glowStrength = glowStrength;
+  }
+}
+class StoveState {
+  constructor({
+    lightCol = new THREE.Color('#ffffff'),
+    lightStrength = 0.6550000311125,
+    lightPos = new THREE.Vector3(0.0, 0.0, 0.0),
+    lightRange = 0.754000035815,
+    lightFalloff = 0.1150000054625,
+    stoveColA = new THREE.Color('#ffffff'),
+    stoveColB = new THREE.Color('#ffffff'),
+    stoveRoughA = 0.1150000054625,
+    stoveRoughB = 0.1150000054625,
+
+  } = {}) {
+    this.lightCol = lightCol;
+    this.lightStrength = lightStrength;
+    this.lightPos = lightPos;
+    this.lightRange = lightRange;
+    this.lightFalloff = lightFalloff;
+    this.stoveColA = stoveColA;
+    this.stoveColB = stoveColB;
+    this.stoveRoughA = stoveRoughA;
+    this.stoveRoughB = stoveRoughB;
+  }
+}
+
+// STATES -----------------------------
+
 const fireStates = {
   cards: {
     left: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 1.0,
-      fireSize : 0.6350000301625,
-      fireSpeed : 0.71200003382,
-      fireAmount : 0.8390000398525,
-      fireDensity : 0.382000018145,
-      fireBorderTop : 0.3370000160075,
-      fireBorderBottom : 0.2010000095475,
-      fireDirection : 0.5,
-      fireStability : 1.0,
+      gradientScaling : 1.0,
+      gradientSpeed : 0.39,
+      vtxNoiseScaling : 3.68,
+      vtxNoiseSpeed : 0.1,
+      vtxNoiseWarp : 0.54,
+      rotation : new THREE.Vector3(0.21, 0, 0),
+      rotationRandom : new THREE.Vector3(0.098, 0, 0),
+      rotationUVPow : 0.78400003724,
+      rotationAffect : 1.0,
+      rotationWorld : new THREE.Vector3(0.61, 0, 0),
+      rotationWorldRandom : new THREE.Vector3(0, 0, 0.2),
+      rotationWorldUVPow : 0.57600002736,
+      rotationWorldAffect : 1.0,
+      offset : new THREE.Vector3(0, 0, 0),
+      offsetRandom : new THREE.Vector3(0.095, 0.05, 0.11),
+      offsetRandomSpeed : 0.5,
+      offsetUVPow : 0.494000023465,
+      offsetAffect : 0.0,
+      UV_Y_Sub : 0.0,
+      UV_Y_Add : 0.0,
+      fireSize : 0.4970000236075,
+      fireSizeVertical : 0.5,
+      fireSpeed : 0.2810000133475,
+      fireSpeedHorizontal : 0.0,
+      fireAmount : 1.0,
+      fireDensity : 0.8530000405175,
+      fireBorderTop : 0.2090000099275,
+      fireBorderBottom : 0.202000009595,
       fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.1110000052725,
-      noiseScale : 0.35200001672,
-      noiseSpeed : 0.174000008265,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.02700000128249999,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 0.1,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
+      fireWarp : 0.178000008455,
+      noiseScale : 0.250000011875,
+      noiseSpeed : 0.374000017765,
+    }),
+    left_middle: new FireState({
+      gradientScaling : 1.0,
+      gradientSpeed : 0.39,
+      vtxNoiseScaling : 3.68,
+      vtxNoiseSpeed : 0.1,
+      vtxNoiseWarp : 0.54,
+      rotation : new THREE.Vector3(0.18, 0, 0),
+      rotationRandom : new THREE.Vector3(0.098, 0, 0),
+      rotationUVPow : 0.78400003724,
+      rotationAffect : 1.0,
+      rotationWorld : new THREE.Vector3(0, 0, 0),
+      rotationWorldRandom : new THREE.Vector3(0, 0, 0.2),
+      rotationWorldUVPow : 0.57600002736,
+      rotationWorldAffect : 1.0,
+      offset : new THREE.Vector3(0, 0, 0),
+      offsetRandom : new THREE.Vector3(0.095, 0.05, 0.11),
+      offsetRandomSpeed : 0.5,
+      offsetUVPow : 0.494000023465,
+      offsetAffect : 0.0,
+      UV_Y_Sub : 0.0,
+      UV_Y_Add : 0.0,
+      fireSize : 0.4970000236075,
+      fireSizeVertical : 0.5,
+      fireSpeed : 0.2810000133475,
+      fireSpeedHorizontal : 0.0,
+      fireAmount : 1.0,
+      fireDensity : 0.5910000280725,
+      fireBorderTop : 0.2090000099275,
+      fireBorderBottom : 0.202000009595,
+      fireFlickerAmount : 0.0,
+      fireFlickerSpeed : 0.5,
+      fireWarp : 0.178000008455,
+      noiseScale : 0.250000011875,
+      noiseSpeed : 0.374000017765,
     }),
     middle: new FireState({
-      vColRAffect : 0.4790000227525,
-      vColGAffect : 0.74400003534,
-      UV_Y_Affect : 0.35600001691,
-      fireSize : 0.2370000112575,
-      fireSpeed : 0.2050000097375,
-      fireAmount : 0.834000039615,
-      fireDensity : 0.1890000089775,
-      fireBorderTop : 0.2050000097375,
-      fireBorderBottom : 0.182000008645,
-      fireDirection : 0.5,
-      fireStability : 0.9710000461225,
+gradientScaling : 1.0,
+gradientSpeed : 0.39,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.1,
+vtxNoiseWarp : 0.54,
+rotation : new THREE.Vector3(0.18, 0, 0),
+rotationRandom : new THREE.Vector3(0.098, 0, 0),
+rotationUVPow : 0.78400003724,
+rotationAffect : 1.0,
+rotationWorld : new THREE.Vector3(0, 0, 0),
+rotationWorldRandom : new THREE.Vector3(0, 0, 0.2),
+rotationWorldUVPow : 0.57600002736,
+rotationWorldAffect : 1.0,
+offset : new THREE.Vector3(0, 0, 0),
+offsetRandom : new THREE.Vector3(0.095, 0.05, 0.11),
+offsetUVPow : 0.494000023465,
+offsetAffect : 0.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0,
+fireSize : 0.4970000236075,
+fireSizeVertical : 0.5,
+fireSpeed : 0.2810000133475,
+fireSpeedHorizontal : 0.0,
+fireAmount : 0.3290000156275,
+fireDensity : 0.5910000280725,
+fireBorderTop : 0.2090000099275,
+fireBorderBottom : 0.202000009595,
+fireFlickerAmount : 0.0,
+fireFlickerSpeed : 0.5,
+fireWarp : 0.178000008455,
+noiseScale : 0.250000011875,
+noiseSpeed : 0.374000017765,
+    }),
+    right_middle: new FireState({
+      gradientScaling : 1.0,
+      gradientSpeed : 0.39,
+      vtxNoiseScaling : 3.68,
+      vtxNoiseSpeed : 0.1,
+      vtxNoiseWarp : 0.54,
+      rotation : new THREE.Vector3(0.18, 0, 0),
+      rotationRandom : new THREE.Vector3(0.098, 0, 0),
+      rotationUVPow : 0.78400003724,
+      rotationAffect : 1.0,
+      rotationWorld : new THREE.Vector3(0, 0, 0),
+      rotationWorldRandom : new THREE.Vector3(0, 0, 0.2),
+      rotationWorldUVPow : 0.57600002736,
+      rotationWorldAffect : 1.0,
+      offset : new THREE.Vector3(0, 0, 0),
+      offsetRandom : new THREE.Vector3(0.095, 0.05, 0.11),
+      offsetRandomSpeed : 0.5,
+      offsetUVPow : 0.494000023465,
+      offsetAffect : 0.0,
+      UV_Y_Sub : 0.0,
+      UV_Y_Add : 0.0,
+      fireSize : 0.4970000236075,
+      fireSizeVertical : 0.5,
+      fireSpeed : 0.32,
+      fireSpeedHorizontal : 0.0,
+      fireAmount : 1.0,
+      fireDensity : 0.5910000280725,
+      fireBorderTop : 0.2090000099275,
+      fireBorderBottom : 0.202000009595,
       fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.106000005035,
-      noiseScale : 0.19600000931,
-      noiseSpeed : 0.1130000053675,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.1330000063175,
-      meshDisplaceSpeed : 0.2650000125875,
-      xDisplaceAmount : 0.15200000722,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.08500005153750001,
-      yOffsetDir : 0.0,
-      zOffsetDir : -0.10399995744000001,
+      fireWarp : 0.178000008455,
+      noiseScale : 0.250000011875,
+      noiseSpeed : 0.374000017765,
     }),
     right: new FireState({
-      vColRAffect : 0.0,
-      vColGAffect : 1.0,
-      UV_Y_Affect : 0.0950000045125,
-      fireSize : 0.5350000254125,
-      fireSpeed : 0.774000036765,
-      fireAmount : 0.8390000398525,
-      fireDensity : 0.2110000100225,
-      fireBorderTop : 0.2230000105925,
-      fireBorderBottom : 0.1770000084075,
-      fireDirection : 0.5,
-      fireStability : 1.0,
+      gradientScaling : 1.0,
+      gradientSpeed : 0.39,
+      vtxNoiseScaling : 3.68,
+      vtxNoiseSpeed : 0.1,
+      vtxNoiseWarp : 0.54,
+      rotation : new THREE.Vector3(0.21, 0, 0),
+      rotationRandom : new THREE.Vector3(0.098, 0, 0),
+      rotationUVPow : 0.78400003724,
+      rotationAffect : 1.0,
+      rotationWorld : new THREE.Vector3(0.61, 0, 0),
+      rotationWorldRandom : new THREE.Vector3(0, 0, 0.2),
+      rotationWorldUVPow : 0.57600002736,
+      rotationWorldAffect : 1.0,
+      offset : new THREE.Vector3(0, 0, 0),
+      offsetRandom : new THREE.Vector3(0.095, 0.05, 0.11),
+      offsetRandomSpeed : 0.5,
+      offsetUVPow : 0.494000023465,
+      offsetAffect : 0.0,
+      UV_Y_Sub : 0.0,
+      UV_Y_Add : 0.0,
+      fireSize : 0.4970000236075,
+      fireSizeVertical : 0.5,
+      fireSpeed : 0.4,
+      fireSpeedHorizontal : 0.0,
+      fireAmount : 1.0,
+      fireDensity : 0.8530000405175,
+      fireBorderTop : 0.2090000099275,
+      fireBorderBottom : 0.202000009595,
       fireFlickerAmount : 0.0,
       fireFlickerSpeed : 0.5,
-      fireWarp : 0.1110000052725,
-      noiseScale : 0.35200001672,
-      noiseSpeed : 0.174000008265,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.02700000128249999,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 0.1,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
-    })
+      fireWarp : 0.178000008455,
+      noiseScale : 0.250000011875,
+      noiseSpeed : 0.374000017765,
+    }),
   },
   cylinders: {
     left: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0,
-      fireSize : 0.4010000190475,
-      fireSpeed : 1.0,
-      fireAmount : 0.0,
+      gradientScaling : 1.0,
+      gradientSpeed : 0.77,
+      vtxNoiseScaling : 3.68,
+      vtxNoiseSpeed : 0.1,
+      vtxNoiseWarp : 0.54,
+      rotation : new THREE.Vector3(0, 0, 0),
+      rotationRandom : new THREE.Vector3(0.1, 0.1, 0.34),
+      rotationUVPow : 1.0,
+      rotationAffect : 1.0,
+      rotationWorld : new THREE.Vector3(0, 0.12, 0),
+      rotationWorldRandom : new THREE.Vector3(0.05, 0.05, 5.115),
+      rotationWorldUVPow : 0.2470000117325,
+      rotationWorldAffect : 1.0,
+      offset : new THREE.Vector3(0, 0, 0),
+      offsetRandom : new THREE.Vector3(0, 0, 0),
+      offsetRandomSpeed : 0.5,
+      offsetUVPow : 1.0,
+      offsetAffect : 1.0,
+      UV_Y_Sub : 0.0,
+      UV_Y_Add : 0.0,
+      fireSize : 0.5570000264575,
+      fireSizeVertical : 0.5,
+      fireSpeed : 0.74400003534,
+      fireSpeedHorizontal : 0.0,
+      fireAmount : 1.0,
       fireDensity : 0.5,
       fireBorderTop : 0.166000007885,
-      fireBorderBottom : 0.21600001026,
-      fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.0,
-      fireFlickerSpeed : 0.5,
+      fireBorderBottom : 0.1650000078375,
+      fireFlickerAmount : 0.7270000345325,
+      fireFlickerSpeed : 0.1930000091675,
       fireWarp : 0.5,
       noiseScale : 0.5,
       noiseSpeed : 0.5,
-      worldUVScale : 15.525,
-      meshDisplaceRange : 0.0230000010925,
-      meshDisplaceSpeed : 0.5,
-      xDisplaceAmount : 0.1,
-      yDisplaceAmount : 0.1,
-      zDisplaceAmount : 0.1,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
+    }),
+    left_middle: new FireState({
+      gradientScaling : 1.0,
+      gradientSpeed : 0.77,
+      vtxNoiseScaling : 3.68,
+      vtxNoiseSpeed : 0.1,
+      vtxNoiseWarp : 0.54,
+      rotation : new THREE.Vector3(0, 0, 0),
+      rotationRandom : new THREE.Vector3(0.1, 0.1, 0.34),
+      rotationUVPow : 1.0,
+      rotationAffect : 1.0,
+      rotationWorld : new THREE.Vector3(0, 0.12, 0),
+      rotationWorldRandom : new THREE.Vector3(0.05, 0.05, 5.115),
+      rotationWorldUVPow : 0.2470000117325,
+      rotationWorldAffect : 1.0,
+      offset : new THREE.Vector3(0, 0, 0),
+      offsetRandom : new THREE.Vector3(0, 0, 0),
+      offsetRandomSpeed : 0.5,
+      offsetUVPow : 1.0,
+      offsetAffect : 1.0,
+      UV_Y_Sub : 0.0,
+      UV_Y_Add : 0.0,
+      fireSize : 0.5570000264575,
+      fireSizeVertical : 0.5,
+      fireSpeed : 0.74400003534,
+      fireSpeedHorizontal : 0.0,
+      fireAmount : 1.0,
+      fireDensity : 0.5,
+      fireBorderTop : 0.166000007885,
+      fireBorderBottom : 0.1650000078375,
+      fireFlickerAmount : 0.7270000345325,
+      fireFlickerSpeed : 0.1930000091675,
+      fireWarp : 0.5,
+      noiseScale : 0.5,
+      noiseSpeed : 0.5,
     }),
     middle: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0,
-      fireSize : 0.4010000190475,
-      fireSpeed : 1.0,
-      fireAmount : 0.0,
-      fireDensity : 0.5,
-      fireBorderTop : 0.166000007885,
-      fireBorderBottom : 0.21600001026,
-      fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.0,
-      fireFlickerSpeed : 0.5,
-      fireWarp : 0.5,
-      noiseScale : 0.5,
-      noiseSpeed : 0.5,
-      worldUVScale : 15.525,
-      meshDisplaceRange : 0.0230000010925,
-      meshDisplaceSpeed : 0.5,
-      xDisplaceAmount : 0.1,
-      yDisplaceAmount : 0.1,
-      zDisplaceAmount : 0.1,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
+gradientScaling : 1.0,
+gradientSpeed : 0.77,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.1,
+vtxNoiseWarp : 0.54,
+rotation : new THREE.Vector3(0, 0, 0),
+rotationRandom : new THREE.Vector3(0.1, 0.1, 0.34),
+rotationUVPow : 1.0,
+rotationAffect : 0.46800002223,
+rotationWorld : new THREE.Vector3(0, 0.12, 0),
+rotationWorldRandom : new THREE.Vector3(0.05, 0.05, 5.115),
+rotationWorldUVPow : 0.2470000117325,
+rotationWorldAffect : 0.1710000081225,
+offset : new THREE.Vector3(0, 0, 0),
+offsetRandom : new THREE.Vector3(0, 0, 0),
+offsetUVPow : 1.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0230000010925,
+fireSize : 0.2170000103075,
+fireSizeVertical : 0.5,
+fireSpeed : 0.058000002755,
+fireSpeedHorizontal : 0.0,
+fireAmount : 1.0,
+fireDensity : 0.5,
+fireBorderTop : 0.166000007885,
+fireBorderBottom : 0.1650000078375,
+fireFlickerAmount : 0.782000037145,
+fireFlickerSpeed : 0.0400000019,
+fireWarp : 0.2410000114475,
+noiseScale : 0.5,
+noiseSpeed : 0.5,
+    }),
+    right_middle: new FireState({
+gradientScaling : 1.0,
+gradientSpeed : 0.77,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.1,
+vtxNoiseWarp : 0.54,
+rotation : new THREE.Vector3(0, 0, 0),
+rotationRandom : new THREE.Vector3(0.1, 0.1, 0.34),
+rotationUVPow : 1.0,
+rotationAffect : 0.46800002223,
+rotationWorld : new THREE.Vector3(0, 0.12, 0),
+rotationWorldRandom : new THREE.Vector3(0.05, 0.05, 5.115),
+rotationWorldUVPow : 0.2470000117325,
+rotationWorldAffect : 0.1710000081225,
+offset : new THREE.Vector3(0, 0, 0),
+offsetRandom : new THREE.Vector3(0, 0, 0),
+offsetUVPow : 1.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0230000010925,
+fireSize : 0.2170000103075,
+fireSizeVertical : 0.5,
+fireSpeed : 0.058000002755,
+fireSpeedHorizontal : 0.0,
+fireAmount : 1.0,
+fireDensity : 0.5,
+fireBorderTop : 0.166000007885,
+fireBorderBottom : 0.1650000078375,
+fireFlickerAmount : 0.782000037145,
+fireFlickerSpeed : 0.0400000019,
+fireWarp : 0.2410000114475,
+noiseScale : 0.5,
+noiseSpeed : 0.5,
     }),
     right: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0950000045125,
-      fireSize : 0.4170000198075,
-      fireSpeed : 0.774000036765,
-      fireAmount : 0.8770000416575,
-      fireDensity : 0.2490000118275,
-      fireBorderTop : 0.278000013205,
-      fireBorderBottom : 0.2000000095,
-      fireDirection : 0.5,
-      fireStability : 0.5600000266,
-      fireFlickerAmount : 0.3330000158175,
-      fireFlickerSpeed : 0.28400001349,
-      fireWarp : 0.20400000969,
-      noiseScale : 0.35200001672,
-      noiseSpeed : 0.174000008265,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.050000002375,
-      meshDisplaceSpeed : 1.0,
-      xDisplaceAmount : 0.1050000049875,
-      yDisplaceAmount : 0.194000009215,
-      zDisplaceAmount : 0.10400000494,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
-    })
+gradientScaling : 1.0,
+gradientSpeed : 0.77,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.1,
+vtxNoiseWarp : 0.54,
+rotation : new THREE.Vector3(0, 0, 0),
+rotationRandom : new THREE.Vector3(0.1, 0.1, 0.34),
+rotationUVPow : 1.0,
+rotationAffect : 0.46800002223,
+rotationWorld : new THREE.Vector3(0, 0.12, 0),
+rotationWorldRandom : new THREE.Vector3(0.05, 0.05, 5.115),
+rotationWorldUVPow : 0.2470000117325,
+rotationWorldAffect : 0.1710000081225,
+offset : new THREE.Vector3(0, 0, 0),
+offsetRandom : new THREE.Vector3(0, 0, 0),
+offsetUVPow : 1.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0230000010925,
+fireSize : 0.2170000103075,
+fireSizeVertical : 0.5,
+fireSpeed : 0.058000002755,
+fireSpeedHorizontal : 0.0,
+fireAmount : 1.0,
+fireDensity : 0.5,
+fireBorderTop : 0.166000007885,
+fireBorderBottom : 0.1650000078375,
+fireFlickerAmount : 0.782000037145,
+fireFlickerSpeed : 0.0400000019,
+fireWarp : 0.2410000114475,
+noiseScale : 0.5,
+noiseSpeed : 0.5,
+    }),
   },
   explosions: {
     left: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0,
-      fireSize : 0.55200002622,
-      fireSpeed : 0.758000036005,
-      fireAmount : 0.4850000230375,
-      fireDensity : 0.0,
-      fireBorderTop : 0.2330000110675,
-      fireBorderBottom : 0.1010000047975,
-      fireDirection : 0.5,
-      fireStability : 0.0,
-      fireFlickerAmount : 0.0,
-      fireFlickerSpeed : 0.5,
-      fireWarp : 0.12400000589,
-      noiseScale : 0.32400001539,
-      noiseSpeed : 0.26400001254,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.027000001282499998,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 1.0,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
+gradientScaling : 0.2,
+gradientSpeed : 0.1,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.05,
+vtxNoiseWarp : 0.35,
+rotation : new THREE.Vector3(0.07, 0, 0),
+rotationRandom : new THREE.Vector3(0, 0, 0),
+rotationUVPow : 0.78400003724,
+rotationAffect : 1.0,
+rotationWorld : new THREE.Vector3(0, 0, 0),
+rotationWorldRandom : new THREE.Vector3(0, 0, 0),
+rotationWorldUVPow : 1.0,
+rotationWorldAffect : 1.0,
+offset : new THREE.Vector3(0, 0.08, 0),
+offsetRandom : new THREE.Vector3(0.08, 0.05, 0.02),
+offsetRandomSpeed : 1.0,
+offsetUVPow : 0.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0,
+fireSize : 0.346000016435,
+fireSizeVertical : 0.5,
+fireSpeed : 0.154000007315,
+fireSpeedHorizontal : 0.050000002375,
+fireAmount : 0.0,
+fireDensity : 0.4870000231325,
+fireBorderTop : 0.2630000124925,
+fireBorderBottom : 0.190000009025,
+fireFlickerAmount : 0.52400002489,
+fireFlickerSpeed : 0.050000002375,
+fireWarp : 0.16400000779,
+noiseScale : 0.51200002432,
+noiseSpeed : 0.1650000078375,
+    }),
+    left_middle: new FireState({
+gradientScaling : 0.2,
+gradientSpeed : 0.1,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.05,
+vtxNoiseWarp : 0.35,
+rotation : new THREE.Vector3(0.07, 0, 0),
+rotationRandom : new THREE.Vector3(0, 0, 0),
+rotationUVPow : 0.78400003724,
+rotationAffect : 1.0,
+rotationWorld : new THREE.Vector3(0, 0, 0),
+rotationWorldRandom : new THREE.Vector3(0, 0, 0),
+rotationWorldUVPow : 1.0,
+rotationWorldAffect : 1.0,
+offset : new THREE.Vector3(0, 0.005, 0),
+offsetRandom : new THREE.Vector3(0.08, 0.05, 0.02),
+offsetRandomSpeed : 1.0,
+offsetUVPow : 0.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0,
+fireSize : 0.346000016435,
+fireSizeVertical : 0.5,
+fireSpeed : 0.154000007315,
+fireSpeedHorizontal : 0.050000002375,
+fireAmount : 0.6,
+fireDensity : 0.4870000231325,
+fireBorderTop : 0.2630000124925,
+fireBorderBottom : 0.190000009025,
+fireFlickerAmount : 0.52400002489,
+fireFlickerSpeed : 0.050000002375,
+fireWarp : 0.16400000779,
+noiseScale : 0.51200002432,
+noiseSpeed : 0.1650000078375,
     }),
     middle: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0,
-      fireSize : 0.3730000177175,
-      fireSpeed : 0.3130000148675,
-      fireAmount : 0.7730000367175,
-      fireDensity : 0.2410000114475,
-      fireBorderTop : 0.3470000164825,
-      fireBorderBottom : 0.22000001045,
-      fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.0,
-      fireFlickerSpeed : 0.5,
-      fireWarp : 0.06800000323,
-      noiseScale : 0.35200001672,
-      noiseSpeed : 0.1270000060325,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.02700000128249999,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 0.1,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
+gradientScaling : 0.2,
+gradientSpeed : 0.1,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.05,
+vtxNoiseWarp : 0.35,
+rotation : new THREE.Vector3(0.07, 0, 0),
+rotationRandom : new THREE.Vector3(0, 0, 0),
+rotationUVPow : 0.78400003724,
+rotationAffect : 1.0,
+rotationWorld : new THREE.Vector3(0, 0, 0),
+rotationWorldRandom : new THREE.Vector3(0, 0, 0),
+rotationWorldUVPow : 1.0,
+rotationWorldAffect : 1.0,
+offset : new THREE.Vector3(0, 0.005, 0),
+offsetRandom : new THREE.Vector3(0.08, 0.05, 0.02),
+offsetRandomSpeed : 1.0,
+offsetUVPow : 0.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0,
+fireSize : 0.346000016435,
+fireSizeVertical : 0.5,
+fireSpeed : 0.154000007315,
+fireSpeedHorizontal : 0.050000002375,
+fireAmount : 0.92,
+fireDensity : 0.4870000231325,
+fireBorderTop : 0.2630000124925,
+fireBorderBottom : 0.190000009025,
+fireFlickerAmount : 0.52400002489,
+fireFlickerSpeed : 0.050000002375,
+fireWarp : 0.16400000779,
+noiseScale : 0.51200002432,
+noiseSpeed : 0.1650000078375,
+    }),
+    right_middle: new FireState({
+gradientScaling : 0.2,
+gradientSpeed : 0.1,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.05,
+vtxNoiseWarp : 0.35,
+rotation : new THREE.Vector3(0.07, 0, 0),
+rotationRandom : new THREE.Vector3(0, 0, 0),
+rotationUVPow : 0.78400003724,
+rotationAffect : 1.0,
+rotationWorld : new THREE.Vector3(0, 0, 0),
+rotationWorldRandom : new THREE.Vector3(0, 0, 0),
+rotationWorldUVPow : 1.0,
+rotationWorldAffect : 1.0,
+offset : new THREE.Vector3(0, 0.08, 0),
+offsetRandom : new THREE.Vector3(0.08, 0.05, 0.02),
+offsetRandomSpeed : 1.0,
+offsetUVPow : 0.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0,
+fireSize : 0.346000016435,
+fireSizeVertical : 0.5,
+fireSpeed : 0.154000007315,
+fireSpeedHorizontal : 0.050000002375,
+fireAmount : 0.6,
+fireDensity : 0.4870000231325,
+fireBorderTop : 0.2630000124925,
+fireBorderBottom : 0.190000009025,
+fireFlickerAmount : 0.52400002489,
+fireFlickerSpeed : 0.050000002375,
+fireWarp : 0.16400000779,
+noiseScale : 0.51200002432,
+noiseSpeed : 0.1650000078375,
     }),
     right: new FireState({
-      vColRAffect : 1.0,
-      vColGAffect : 0.0,
-      UV_Y_Affect : 0.0,
-      fireSize : 0.3730000177175,
-      fireSpeed : 0.61200002907,
-      fireAmount : 0.782000037145,
-      fireDensity : 0.350000016625,
-      fireBorderTop : 0.390000018525,
-      fireBorderBottom : 0.234000011115,
-      fireDirection : 0.5,
-      fireStability : 1.0,
-      fireFlickerAmount : 0.1090000051775,
-      fireFlickerSpeed : 0.5,
-      fireWarp : 0.1150000054625,
-      noiseScale : 0.35200001672,
-      noiseSpeed : 0.1270000060325,
-      worldUVScale : 11.575,
-      meshDisplaceRange : 0.02700000128249999,
-      meshDisplaceSpeed : 0.106000005035,
-      xDisplaceAmount : 0.1,
-      yDisplaceAmount : 0.0,
-      zDisplaceAmount : 0.0,
-      xOffsetDir : 0.0,
-      yOffsetDir : 0.0,
-      zOffsetDir : 0.0,
-    })
-  }
+gradientScaling : 0.2,
+gradientSpeed : 0.1,
+vtxNoiseScaling : 3.68,
+vtxNoiseSpeed : 0.05,
+vtxNoiseWarp : 0.35,
+rotation : new THREE.Vector3(0.07, 0, 0),
+rotationRandom : new THREE.Vector3(0, 0, 0),
+rotationUVPow : 0.78400003724,
+rotationAffect : 1.0,
+rotationWorld : new THREE.Vector3(0, 0, 0),
+rotationWorldRandom : new THREE.Vector3(0, 0, 0),
+rotationWorldUVPow : 1.0,
+rotationWorldAffect : 1.0,
+offset : new THREE.Vector3(0, 0.08, 0),
+offsetRandom : new THREE.Vector3(0.08, 0.05, 0.02),
+offsetRandomSpeed : 1.0,
+offsetUVPow : 0.0,
+offsetAffect : 1.0,
+UV_Y_Sub : 0.0,
+UV_Y_Add : 0.0,
+fireSize : 0.346000016435,
+fireSizeVertical : 0.5,
+fireSpeed : 0.154000007315,
+fireSpeedHorizontal : 0.050000002375,
+fireAmount : 0.0,
+fireDensity : 0.4870000231325,
+fireBorderTop : 0.2630000124925,
+fireBorderBottom : 0.190000009025,
+fireFlickerAmount : 0.52400002489,
+fireFlickerSpeed : 0.050000002375,
+fireWarp : 0.16400000779,
+noiseScale : 0.51200002432,
+noiseSpeed : 0.1650000078375,
+    }),
+  },
 };
 const logStates = {
-  logs: {
+  log: {
     left: new LogState({
-      burnCol : [0.18777841, 0.17290697, 0.12215609],
-      glowCol : [1, 0.18039216, 0],
-      burnAmount : 0.6550000311125,
-      burnStrength : 0.2000000095,
-      glowAmount : 0.754000035815,
-      glowStrength : 0.1150000054625,
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.46800002223,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.65200003097,
+      glowStrength : 0.2110000100225,
+    }),
+    left_middle: new LogState({
+      logCoal : 0.0,
+      ashAmount : 1.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.426000020235,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.65200003097,
+      glowStrength : 0.0590000028025,
     }),
     middle: new LogState({
-      burnCol : [0.18777841, 0.17290697, 0.12215609],
-      glowCol : [1, 0.18039216, 0],
-      burnAmount : 0.6550000311125,
-      burnStrength : 0.2000000095,
-      glowAmount : 0.754000035815,
-      glowStrength : 0.1150000054625,
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.3090000146775,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.6310000299725,
+      glowStrength : 0.02000000095,
+    }),
+    right_middle: new LogState({
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.3090000146775,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.6310000299725,
+      glowStrength : 0.02000000095,
     }),
     right: new LogState({
-      burnCol : [0.18777841, 0.17290697, 0.12215609],
-      glowCol : [1, 0.18039216, 0],
-      burnAmount : 0.6550000311125,
-      burnStrength : 0.2000000095,
-      glowAmount : 0.754000035815,
-      glowStrength : 0.1150000054625,
-    })
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.3090000146775,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.6310000299725,
+      glowStrength : 0.02000000095,
+    }),
+  },
+  coal: {
+    left: new LogState({
+      logCoal : 1.0,
+      ashAmount : 0.8730000414675,
+      ashStrength : 0.274000013015,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.0610000028975,
+      burnStrength : 0.066000003135,
+      glowAmount : 0.8710000413725,
+      glowStrength : 0.01200000057,
+    }),
+    left_middle: new LogState({
+      logCoal : 1.0,
+      ashAmount : 0.8730000414675,
+      ashStrength : 0.274000013015,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.0610000028975,
+      burnStrength : 0.066000003135,
+      glowAmount : 0.8710000413725,
+      glowStrength : 0.01200000057,
+    }),
+    middle: new LogState({
+      logCoal : 1.0,
+      ashAmount : 0.8730000414675,
+      ashStrength : 0.274000013015,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.0610000028975,
+      burnStrength : 0.066000003135,
+      glowAmount : 0.8710000413725,
+      glowStrength : 0.01200000057,
+    }),
+    right_middle: new LogState({
+      logCoal : 1.0,
+      ashAmount : 0.8730000414675,
+      ashStrength : 0.274000013015,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.0610000028975,
+      burnStrength : 0.066000003135,
+      glowAmount : 0.9030000428925,
+      glowStrength : 0.0630000029925,
+    }),
+    right: new LogState({
+      logCoal : 1.0,
+      ashAmount : 0.8730000414675,
+      ashStrength : 0.274000013015,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.0610000028975,
+      burnStrength : 0.066000003135,
+      glowAmount : 0.9030000428925,
+      glowStrength : 0.0630000029925,
+    }),
+  },
+  ember_bed: {
+    left: new LogState({
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.46800002223,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.65200003097,
+      glowStrength : 0.2110000100225,
+    }),
+    left_middle: new LogState({
+      logCoal : 0.0,
+      ashAmount : 1.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.426000020235,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.65200003097,
+      glowStrength : 0.0590000028025,
+    }),
+    middle: new LogState({
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.3090000146775,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.6310000299725,
+      glowStrength : 0.02000000095,
+    }),
+    right_middle: new LogState({
+      logCoal : 0.0,
+      ashAmount : 1.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.426000020235,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.65200003097,
+      glowStrength : 0.0590000028025,
+    }),
+    right: new LogState({
+      logCoal : 0.0,
+      ashAmount : 0.0,
+      ashStrength : 0.042000001995,
+      burnCol : new THREE.Color('#393939'),
+      glowCol : new THREE.Color('#ff3300'),
+      burnAmount : 0.46800002223,
+      burnStrength : 0.178000008455,
+      glowAmount : 0.65200003097,
+      glowStrength : 0.2110000100225,
+    }),
+  },
+};
+const stoveStates = {
+  stove_insulation: {
+    left: new StoveState({
+      lightCol : new THREE.Color('#ff4400'),
+      lightStrength : 12.575,
+      lightPos : new THREE.Vector3(0.0, 0.018, 0.004),
+      lightRange : 0.31,
+      lightFalloff : 1.27,
+      stoveColA : new THREE.Color('#cbab87'),
+      stoveColB : new THREE.Color('#8b6e4d'),
+      stoveRoughA : 0.69,
+      stoveRoughB : 1.0,
+    }),
+    left_middle: new StoveState({
+      lightCol : new THREE.Color('#ff4400'),
+      lightStrength : 9.575,
+      lightPos : new THREE.Vector3(0.0, 0.018, 0.004),
+      lightRange : 0.31,
+      lightFalloff : 1.27,
+      stoveColA : new THREE.Color('#cbab87'),
+      stoveColB : new THREE.Color('#8b6e4d'),
+      stoveRoughA : 0.69,
+      stoveRoughB : 1.0,
+    }),
+    middle: new StoveState({
+      lightCol : new THREE.Color('#ff4400'),
+      lightStrength : 2.165,
+      lightPos : new THREE.Vector3(0.0, 0.018, 0.004),
+      lightRange : 0.31,
+      lightFalloff : 1.27,
+      stoveColA : new THREE.Color('#cbab87'),
+      stoveColB : new THREE.Color('#8b6e4d'),
+      stoveRoughA : 0.69,
+      stoveRoughB : 1.0,
+    }),
+    right_middle: new StoveState({
+      lightCol : new THREE.Color('#ff4400'),
+      lightStrength : 8.575,
+      lightPos : new THREE.Vector3(0.0, 0.018, 0.004),
+      lightRange : 0.31,
+      lightFalloff : 1.27,
+      stoveColA : new THREE.Color('#cbab87'),
+      stoveColB : new THREE.Color('#8b6e4d'),
+      stoveRoughA : 0.69,
+      stoveRoughB : 1.0,
+    }),
+    right: new StoveState({
+      lightCol : new THREE.Color('#ff4400'),
+      lightStrength : 12.575,
+      lightPos : new THREE.Vector3(0.0, 0.018, 0.004),
+      lightRange : 0.31,
+      lightFalloff : 1.27,
+      stoveColA : new THREE.Color('#cbab87'),
+      stoveColB : new THREE.Color('#8b6e4d'),
+      stoveRoughA : 0.69,
+      stoveRoughB : 1.0,
+    }),
   },
 };
 
@@ -615,7 +1338,10 @@ const materialsByType = {
   cards: [],
   cylinders: [],
   explosions: [],
-  logs: []
+  log: [],
+  coal: [],
+  ember_bed: [],
+  stove: []
 };
 
 const animNames = [
@@ -630,15 +1356,31 @@ const actions = {};
 const finishedActions = new Set();
 const customMaterials = [];
 
+// MESHES -----------------------------
 
-const fireCards = new Set([
-  'fire_card_01',
-  'fire_card_02',
-  'fire_card_03',
-  'fire_card_04',
+const log_meshes = new Set([
+  'log',
 ]);
-
-const fireCylinders = new Set([
+const wood_fire_meshes = new Set([
+  'wood_fire_01',
+  'wood_fire_02',
+  'wood_fire_03',
+  'wood_fire_04',
+  'wood_fire_05',
+  'wood_fire_06',
+  'wood_fire_07',
+]);
+const coal_meshes = new Set([
+  'coal'
+]);
+const coal_fire_meshes = new Set([
+  'coal_fire_01',
+  'coal_fire_02',
+  'coal_fire_03',
+  'coal_fire_04',
+  'coal_fire_05',
+]);
+const fire_cylinder_meshes = new Set([
   'fire_cylinder_01',
   'fire_cylinder_02',
   'fire_cylinder_03',
@@ -647,21 +1389,19 @@ const fireCylinders = new Set([
   'fire_cylinder_06',
   'fire_cylinder_07',
   'fire_cylinder_08',
-  'fire_cylinder_09',
-  'fire_cylinder_10',
-  'fire_cylinder_11',
-  'fire_cylinder_12',
-  'fire_cylinder_13',
-  'fire_cylinder_14',
+]);
+const fire_explosion_meshes = new Set([
+  'fire_explosion_01',
+  'fire_explosion_02',
+  'fire_explosion_03',
+]);
+const ember_bed_meshes = new Set([
+  'ember_bed',
 ]);
 
-const fireExplosions = new Set([
-  'fire_explosion_01',
-])
-
-const logs = new Set([
-  'logs',
-])
+const woodFireMeshObjects = [];
+const coalFireMeshObjects = [];
+const explosionsMeshObjects = [];
 
 let animLerp = 0;
 let fireLerp = 0;
@@ -670,22 +1410,321 @@ let targetLerp = 0;
 let mixer;
 let model;
 
-// Texture loader
 const textureLoader = new THREE.TextureLoader();
 
-const fireMaskTex = textureLoader.load('/assets/textures/fire.png');
-fireMaskTex.wrapS = THREE.RepeatWrapping;
-fireMaskTex.wrapT = THREE.RepeatWrapping;
+const noiseTex = textureLoader.load('/assets/textures/fire.png');
+noiseTex.flipY = false;
+noiseTex.wrapS = THREE.RepeatWrapping;
+noiseTex.wrapT = THREE.RepeatWrapping;
 
-const fireColorTex = textureLoader.load('/assets/textures/fire_gradient.png');
-fireColorTex.wrapS = THREE.RepeatWrapping;
-fireColorTex.wrapT = THREE.RepeatWrapping;
-fireColorTex.colorSpace = THREE.SRGBColorSpace;
+const gradientTex = textureLoader.load('/assets/textures/gradient.png');
+gradientTex.flipY = false;
+gradientTex.wrapS = THREE.RepeatWrapping;
+gradientTex.wrapT = THREE.RepeatWrapping;
+gradientTex.colorSpace = THREE.SRGBColorSpace;
 
-const logColorTex = textureLoader.load('/assets/textures/logs_color.png');
-logColorTex.wrapS = THREE.RepeatWrapping;
-logColorTex.wrapT = THREE.RepeatWrapping;
-logColorTex.colorSpace = THREE.SRGBColorSpace;
+const logTex = textureLoader.load('/assets/textures/wood.png');
+logTex.flipY = false;
+logTex.wrapS = THREE.RepeatWrapping;
+logTex.wrapT = THREE.RepeatWrapping;
+logTex.colorSpace = THREE.SRGBColorSpace;
+
+const stoveMasksAO = textureLoader.load('/assets/textures/stove_masks_AO.png');
+stoveMasksAO.flipY = false;
+stoveMasksAO.wrapS = THREE.RepeatWrapping;
+stoveMasksAO.wrapT = THREE.RepeatWrapping;
+
+const stoveNormals = textureLoader.load('/assets/textures/stove_normals_1.png');
+stoveNormals.flipY = false;
+stoveNormals.wrapS = THREE.RepeatWrapping;
+stoveNormals.wrapT = THREE.RepeatWrapping;
+
+// UNIFORMS & MATERIALS -----------------------------
+
+const fire_card_uniforms = buildFireUniforms(
+  lerpFiveFireStates(
+    fireStates.cards.left,
+    fireStates.cards.left_middle,
+    fireStates.cards.middle,
+    fireStates.cards.right_middle,
+    fireStates.cards.right,
+    fireLerp
+));
+
+const fire_cards_mat = new THREE.ShaderMaterial({
+  vertexShader: fireVertexShader,
+  fragmentShader: fireFragmentShader,
+  uniforms: fire_card_uniforms,
+  transparent : true,
+  side : THREE.DoubleSide,
+  alphaTest : 0.5,
+  depthWrite : false,
+  vertexColors : true,
+  depthTest : true,
+})
+
+const fire_cylinders_uniforms = buildFireUniforms(
+  lerpFiveFireStates(
+    fireStates.cylinders.left,
+    fireStates.cylinders.left_middle,
+    fireStates.cylinders.middle,
+    fireStates.cylinders.right_middle,
+    fireStates.cylinders.right,
+    fireLerp
+));
+
+const fire_cylinders_mat = new THREE.ShaderMaterial({
+  vertexShader: fireVertexShader,
+  fragmentShader: fireFragmentShader,
+  uniforms: fire_cylinders_uniforms,
+  transparent : true,
+  side : THREE.DoubleSide,
+  alphaTest : 0.5,
+  depthWrite : false,
+  vertexColors : true,
+  depthTest : true,
+})
+
+const fire_explosions_uniforms = buildFireUniforms(
+  lerpFiveFireStates(
+    fireStates.explosions.left,
+    fireStates.explosions.left_middle,
+    fireStates.explosions.middle,
+    fireStates.explosions.right_middle,
+    fireStates.explosions.right,
+    fireLerp
+));
+
+const fire_explosions_mat = new THREE.ShaderMaterial({
+  vertexShader: fireVertexShader,
+  fragmentShader: fireFragmentShader,
+  uniforms: fire_explosions_uniforms,
+  transparent : true,
+  side : THREE.DoubleSide,
+  alphaTest : 0.5,
+  depthWrite : false,
+  vertexColors : true,
+  depthTest : true,
+})
+
+const stove_dark_uniforms = {
+  TIME:           { value: 0.0 },
+  lightCol:       { value: new THREE.Color('#ff4400') },
+  lightStrength:  { value: 0.0 },
+  lightPos:       { value: new THREE.Vector3(0.0, 0.018, 0.0) },
+  lightRange:     { value: 0.31 },
+  lightFalloff:   { value: 1.27 },
+  stoveColA:      { value: new THREE.Color('#383334') },
+  stoveColB:      { value: new THREE.Color('#171615') },
+  stoveRoughA:    { value: 0.329 },
+  stoveRoughB:    { value: 0.457 },
+}; 
+
+const stove_dark_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshPhysicalMaterial, 
+  normalMap: stoveNormals,
+  specularIntensityMap: stoveMasksAO,
+  vertexShader: stoveBodyVertexShader,
+  fragmentShader: stoveBodyFragmentShader,
+  uniforms: stove_dark_uniforms,
+    patchMap: {
+  "*": {
+    "#include <normal_fragment_maps>": `
+      #ifdef USE_NORMALMAP
+        vec4 packedNormal = texture2D(normalMap, uv);
+
+        vec2 rg = packedNormal.rg * 2.0 - 1.0;
+        vec3 mapN = vec3(rg, 1.0);
+        mapN.xy *= normalScale;
+
+        normal = normalize(tbn * mapN);
+      #endif
+    `
+    }
+  },
+  side: THREE.FrontSide,
+  vertexColors: true,
+});
+
+const stove_insulation_uniforms = buildStoveUniforms(
+  lerpFiveStoveStates(
+    stoveStates.stove_insulation.left,
+    stoveStates.stove_insulation.left_middle,
+    stoveStates.stove_insulation.middle,
+    stoveStates.stove_insulation.right_middle,
+    stoveStates.stove_insulation.right,
+    fireLerp
+  )
+)
+
+const stove_insulation_nolight_uniforms = {
+  TIME:           { value: 0.0 },
+  lightCol:       { value: new THREE.Color('#ff4400') },
+  lightStrength:  { value: 0.0 },
+  lightPos:       { value: new THREE.Vector3(0.0, 0.018, 0.0) },
+  lightRange:     { value: 0.31 },
+  lightFalloff:   { value: 1.27 },
+  stoveColA:      { value: new THREE.Color('#cbab87') },
+  stoveColB:      { value: new THREE.Color('#8b6e4d') },
+  stoveRoughA:    { value: 0.69 },
+  stoveRoughB:    { value: 1.0 },
+}; 
+
+const stove_insulation_nolight_mat = new CustomShaderMaterial({
+  vertexColors: true,
+  baseMaterial: THREE.MeshPhysicalMaterial, 
+  specularIntensityMap: stoveMasksAO,
+  vertexShader: stoveBodyVertexShader,
+  fragmentShader: stoveBodyFragmentShader,
+  uniforms: stove_insulation_nolight_uniforms,
+  side: THREE.FrontSide,
+});
+
+const stove_insulation_mat = new CustomShaderMaterial({
+  vertexColors: true,
+  baseMaterial: THREE.MeshPhysicalMaterial, 
+  specularIntensityMap: stoveMasksAO,
+  vertexShader: stoveBodyVertexShader,
+  fragmentShader: stoveBodyFragmentShader,
+  uniforms: stove_insulation_uniforms,
+  side: THREE.FrontSide,
+});
+
+const log_uniforms = buildLogUniforms(
+  lerpFiveLogStates(
+    logStates.log.left,
+    logStates.log.left_middle,
+    logStates.log.middle,
+    logStates.log.right_middle,
+    logStates.log.right,
+    fireLerp
+  )
+);
+
+const log_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshStandardMaterial,
+  vertexShader: logVertexShader,
+  fragmentShader: logFragmentShader,
+  uniforms: log_uniforms,
+  vertexColors: true,
+})
+
+const coal_uniforms = 
+  buildLogUniforms(
+    lerpFiveLogStates(
+      logStates.coal.left,
+      logStates.coal.left_middle,
+      logStates.coal.middle,
+      logStates.coal.right_middle,
+      logStates.coal.right,
+      fireLerp
+    )
+  );
+
+
+
+const coal_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshStandardMaterial,
+  vertexShader: logVertexShader,
+  fragmentShader: logFragmentShader,
+  uniforms: coal_uniforms,
+  vertexColors: true,
+})
+
+const ember_bed_uniforms = buildLogUniforms(
+  lerpFiveLogStates(
+    logStates.ember_bed.left,
+    logStates.ember_bed.left_middle,
+    logStates.ember_bed.middle,
+    logStates.ember_bed.right_middle,
+    logStates.ember_bed.right,
+    fireLerp
+  )
+);
+
+const ember_bed_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshStandardMaterial,
+  vertexShader: logVertexShader,
+  fragmentShader: logFragmentShader,
+  uniforms: ember_bed_uniforms,
+  vertexColors: true,
+})
+
+const rope_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshStandardMaterial,
+  vertexShader: ropeVertexShader,
+  fragmentShader: ropeFragmentShader,
+  uniforms: {
+    stoveMasksAO: stoveMasksAO,
+  },
+  normalMap: stoveNormals,
+  patchMap: {
+  "*": {
+    "#include <normal_fragment_maps>": `
+      #ifdef USE_NORMALMAP
+        vec4 packedNormal = texture2D(normalMap, rotateUV(UV * 250.0, -45.0, vec2(0.5)));
+
+        vec2 ba = packedNormal.ba * 2.0 - 1.0;
+        vec3 mapN = vec3(ba, 1.0);
+        mapN.rg *= normalScale;
+
+        normal = normalize(tbn * mapN);
+      #endif
+    `
+    }
+  },
+})
+
+const rubber_mat = new THREE.MeshStandardMaterial({
+  color: new THREE.Color('#3f3b3b'),
+  roughness: 0.8,
+})
+
+const brushed_metal_uniforms = {
+  TIME: { value: 1.0 },
+  stoveMasksAO:   { value: stoveMasksAO },
+  maskSelect: { value: 1 },
+  stoveColorA: { value: new THREE.Color('#d4d4d4') },
+  stoveColorB: { value: new THREE.Color('#acacac') },
+  stoveRoughA: { value: 0.341 },
+  stoveRoughB: { value: 0.103 },
+}
+
+const handle_metal_uniforms = {
+  TIME: { value: 1.0 },
+  stoveMasksAO:   { value: stoveMasksAO },
+  maskSelect: { value: 2 },
+  stoveColorA: { value: new THREE.Color('#544d48') },
+  stoveColorB: { value: new THREE.Color('#544d48') },
+  stoveRoughA: { value: 0.347 },
+  stoveRoughB: { value: 0.198 },
+}
+
+const brushed_metal_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshPhysicalMaterial,
+  specularIntensityMap: stoveMasksAO,
+  vertexShader: metalVertexShader,
+  fragmentShader: metalFragmentShader,
+  uniforms: brushed_metal_uniforms,
+
+})
+
+const handle_metal_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshPhysicalMaterial,
+  specularIntensityMap: stoveMasksAO,
+  vertexShader: metalVertexShader,
+  fragmentShader: metalFragmentShader,
+  uniforms: handle_metal_uniforms,
+
+})
+
+const glass_mat = new THREE.MeshStandardMaterial({
+  color: ('#ffffff'),
+  transparent: true,
+  opacity: 0.02,
+  roughness: 0.0,
+})
+
 
 // Scene stuff
 const timer = new THREE.Timer();
@@ -696,15 +1735,28 @@ const container = document.getElementById('container');
 const stats = new Stats();
 container.appendChild(stats.dom);
 
+// Slider for targetLerp (0-1)
+const lerpSlider = document.createElement('input');
+lerpSlider.type = 'range';
+lerpSlider.min = '0';
+lerpSlider.max = '1';
+lerpSlider.step = '0.01';
+lerpSlider.value = targetLerp;
+Object.assign(lerpSlider.style, {
+  position: 'fixed',
+  bottom: '20px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  width: '300px',
+  zIndex: '1000',
+});
+lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)));
+container.appendChild(lerpSlider);
+
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
-camera.position.set(5, 2, 8);
-
-const fireLight = new THREE.PointLight(0xff8d00, 2.0);
-scene.add( fireLight );
-const pointLighthelper = new THREE.PointLightHelper( fireLight, 1);
-// scene.add(pointLighthelper);
+camera.position.set(0.5, 0.1, 1.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -735,27 +1787,30 @@ const ssaoPass = new SSAOPass(renderer, camera, innerWidth, innerHeight);
 
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.5,   // intensity
-  0.7,   // radius
+  0.1,   // intensity
+  0.3,   // radius
   0.8    // threshold
 );
 
 composer.addPass(bloom);
 
+
 const rgbe = new HDRLoader();
-const envMap = await rgbe.loadAsync('/assets/hdri/photo_studio_01_2k.hdr');
+const envMap = await rgbe.loadAsync('/assets/hdri/brown_photostudio_01_2k.hdr');
 envMap.mapping = THREE.EquirectangularReflectionMapping;
+
 scene.environment = envMap;
 scene.environmentRotation.set(0, 0, 0);
-scene.background = new THREE.Color(0xe6cdad);
+scene.background = envMap;
+// scene.background = new THREE.Color(0xe6cdad);
 scene.backgroundBlurriness = 1;
-scene.backgroundIntensity = 0.9;
-scene.environmentIntensity = 0.9;
+// scene.backgroundIntensity = 0.9;
+scene.environmentIntensity = 0.8;
 
 // Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(0, 0.7, 0);
+controls.target.set(0, 0, 0);
 controls.mouseButtons = {
   LEFT: THREE.MOUSE.PAN = 2,
   MIDDLE: THREE.MOUSE.ROTATE = 0,
@@ -764,6 +1819,8 @@ controls.mouseButtons = {
 
 controls.update();
 
+renderer.setAnimationLoop(animate);
+
 // GLTF Loader
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://unpkg.com/three@0.184.0/examples/jsm/libs/draco/gltf/');
@@ -771,135 +1828,63 @@ dracoLoader.setDecoderPath('https://unpkg.com/three@0.184.0/examples/jsm/libs/dr
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 loader.load(
-  '/assets/gltf/stoveWithFire.glb',
+  '/assets/gltf/stove.glb',
   (gltf) => {
     model = gltf.scene;
     model.position.set(0, 0, 0);
-    model.scale.set(5.0, 5.0, 5.0);
-    // model.rotation.set(0.0, 180.0, 0.0);
     scene.add(model);
-
+    
+    
     model.traverse((child) => {
-      let materialType = null;
-      let baseMaterial = null;
-
       if (!child.isMesh) return;
 
-      if (fireCards && fireCylinders && fireExplosions.has(child.name)){
-        child.castShadow = false;
-        child.receiveShadow = false;
-      };
+      const oldMat = child.material;
+      oldMat.dispose();
 
-      if (fireCards.has(child.name)){
-        materialType = 'cards';
-        const blended = lerpThreeFireStates(
-          fireStates.cards.left,
-          fireStates.cards.middle,
-          fireStates.cards.right,
-          fireLerp
-        );
-        baseMaterial = new THREE.ShaderMaterial({
-          uniforms: buildFireUniforms(blended),
-          vertexShader : fireVertexShader,
-          fragmentShader : fireFragmentShader,
-          transparent : true,
-          side : THREE.DoubleSide,
-          alphaTest : 0.5,
-          depthWrite : false,
-          vertexColors : true,
-          depthTest : true,
-        });
-      }
-
-      else if (fireCylinders.has(child.name)){
-        materialType = 'cylinders';
-        const blended = lerpThreeFireStates(
-          fireStates.cylinders.left,
-          fireStates.cylinders.middle,
-          fireStates.cylinders.right,
-          fireLerp
-        );
-        baseMaterial = new THREE.ShaderMaterial({
-          uniforms: buildFireUniforms(blended),
-          vertexShader : fireVertexShader,
-          fragmentShader : fireFragmentShader,
-          transparent : true,
-          side : THREE.DoubleSide,
-          alphaTest : 0.5,
-          depthWrite : false,
-          vertexColors : true,
-        });
-      }
-
-      else if (fireExplosions.has(child.name)){
-        materialType = 'explosions';
-        const blended = lerpThreeFireStates(
-          fireStates.explosions.left,
-          fireStates.explosions.middle,
-          fireStates.explosions.right,
-          fireLerp
-        );
-        baseMaterial = new THREE.ShaderMaterial({
-          uniforms: buildFireUniforms(blended),
-          vertexShader : fireVertexShader,
-          fragmentShader : fireFragmentShader,
-          transparent : true,
-          side : THREE.DoubleSide,
-          alphaTest : 0.5,
-          depthWrite : false,
-          vertexColors : true,
-        });
-      }
-
-      if (baseMaterial && materialType) {
-        baseMaterial.uniforms.TIME = { value : 0};
-        baseMaterial.uniforms.firePhase = { value : 0};
-        baseMaterial.uniforms.fireTex = { value : fireMaskTex};
-        baseMaterial.uniforms.fireCol = { value : fireColorTex};
-        child.material = baseMaterial;
-
-        materialsByType[materialType].push(baseMaterial);
-        customMaterials.push(baseMaterial);
-
-        console.log(`Applied ${materialType} log shader to:`, child.name);
-      }
-    });
-
-    model.traverse((child) => {
       let materialType = null;
       let baseMaterial = null;
-
-      if (!child.isMesh) return;
-
-      else if (logs.has(child.name)){
-        materialType = 'logs';
-        const blended = lerpThreeLogStates(
-          logStates.logs.left,
-          logStates.logs.middle,
-          logStates.logs.right,
-          fireLerp
-        );
-        baseMaterial = new THREE.ShaderMaterial({
-          uniforms: buildLogUniforms(blended),
-          vertexShader : logsVertexShader,
-          fragmentShader : logsFragmentShader,
-          vertexColors : true,
-        });
-      }
-
-      if (baseMaterial && materialType) {
-        baseMaterial.uniforms.TIME = { value : 0};
-        baseMaterial.uniforms.firePhase = { value : 0};
-        baseMaterial.uniforms.logTex = { value : logColorTex};
-        baseMaterial.uniforms.noiseTex = { value : fireMaskTex};
-        child.material = baseMaterial;
-
-        materialsByType[materialType].push(baseMaterial);
-        customMaterials.push(baseMaterial);
-
-        console.log(`Applied ${materialType} log shader to:`, child.name);
-      }
       
+      if (child.isMesh) {
+        
+        if (child.material.name === 'dark_surface') {
+          child.material = stove_dark_mat.clone();
+
+        } else if (child.material.name === 'insulation_surface') {
+          materialType = 'stove';
+          baseMaterial = stove_insulation_mat;
+
+        } else if (child.material.name === 'insulation_surface_nolight') {
+          materialType = 'stove';
+          baseMaterial = stove_insulation_nolight_mat;
+
+        } else if (child.material.name === 'glass') {
+          child.material = glass_mat;
+          
+        } else if (child.material.name === 'rope') {
+          child.material = rope_mat;
+
+        } else if (child.material.name === 'rubber') {
+          child.material = rubber_mat;
+
+        } else if (child.material.name === 'metal') {
+          child.material = brushed_metal_mat;
+          
+        } else if (child.material.name === 'handle') {
+          child.material = handle_metal_mat;
+        };
+
+        if (baseMaterial && materialType) {
+        baseMaterial.uniforms.TIME = { value : 0};
+        baseMaterial.uniforms.stoveMasksAO = { value : stoveMasksAO};
+        baseMaterial.uniforms.stoveNormals = { value : stoveNormals};
+        child.material = baseMaterial;
+
+        materialsByType[materialType].push(baseMaterial);
+        customMaterials.push(baseMaterial);
+      }
+  
+
+      };
     });
 
     mixer = new THREE.AnimationMixer(model);
@@ -912,7 +1897,6 @@ loader.load(
     
     console.log('Available actions:', Object.keys(actions));
 
-    renderer.setAnimationLoop(animate);
 
     document.querySelectorAll('#buttons button').forEach((btn, i) => {
       btn.style.cssText = 'padding:10px 20px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #ccc;border-radius:4px;';
@@ -920,7 +1904,116 @@ loader.load(
         playAction(animNames[i]);
       });
     });
+    document.getElementById('btn-left').addEventListener('click', () => {
+      setTarget(0);
+      // console.log(fireLerp);
+    });
+    document.getElementById('btn-middle').addEventListener('click', () => {
+      setTarget(0.5);
+      // console.log(fireLerp);
+    });
+    document.getElementById('btn-right').addEventListener('click', () => {
+      setTarget(1);
+      // console.log(fireLerp);
+    });
+  },
+  undefined,
+  (error) => { console.error(error); }
+);
 
+loader.load(
+  '/assets/gltf/fire.glb',
+  (gltf) => {
+    model = gltf.scene;
+    model.position.set(0, 0, 0);
+    scene.add(model);
+
+    model.traverse((child) => {
+      let materialType = null;
+      let baseMaterial = null;
+
+      if (!child.isMesh) return;
+
+      if (wood_fire_meshes && coal_fire_meshes && fire_cylinder_meshes && fire_explosion_meshes.has(child.name)){
+        child.castShadow = false;
+        child.receiveShadow = false;
+      };
+
+      if (wood_fire_meshes.has(child.name)){
+        materialType = 'cards';
+        baseMaterial = fire_cards_mat.clone();
+        woodFireMeshObjects.push(child);
+        // child.visible = false;
+
+      } else if (coal_fire_meshes.has(child.name)){
+        materialType = 'cards';
+        baseMaterial = fire_cards_mat.clone();
+        coalFireMeshObjects.push(child);
+        // child.visible = false;
+
+      } else if (fire_cylinder_meshes.has(child.name)){
+        materialType = 'cylinders';
+        baseMaterial = fire_cylinders_mat.clone();
+
+      } else if (fire_explosion_meshes.has(child.name)){
+        materialType = 'explosions';
+        baseMaterial = fire_explosions_mat.clone();
+        explosionsMeshObjects.push(child);
+        // child.visible = false;
+
+      } else if (log_meshes.has(child.name)){
+        materialType = 'log';
+        baseMaterial = log_mat.clone();
+        woodFireMeshObjects.push(child);
+
+      } else if (coal_meshes.has(child.name)){
+        materialType = 'coal';
+        baseMaterial = coal_mat.clone();
+        coalFireMeshObjects.push(child);
+        // child.visible = false;
+
+      } else if (ember_bed_meshes.has(child.name)){
+        materialType = 'ember_bed';
+        baseMaterial = ember_bed_mat.clone();
+
+      };
+
+      if (baseMaterial && materialType) {
+        baseMaterial.uniforms.TIME = { value : 0},
+
+        baseMaterial.uniforms.gradientSpeedDelta = { value: 0 },
+        baseMaterial.uniforms.vtxNoiseSpeedDelta = { value: 0 },
+        baseMaterial.uniforms.fireSpeedDelta = { value: 0 },
+        baseMaterial.uniforms.fireSpeedHDelta = { value: 0 },
+        baseMaterial.uniforms.fireFlickerSpeedDelta = { value: 0 },
+        baseMaterial.uniforms.noiseSpeedDelta = { value: 0 },
+        baseMaterial.uniforms.fireSpeedDelta = { value: 0 },
+
+        
+        baseMaterial.uniforms.noiseTex = { value : noiseTex};
+        baseMaterial.uniforms.gradientTex = { value : gradientTex};
+        baseMaterial.uniforms.logTex = { value : logTex};
+        child.material = baseMaterial;
+
+        materialsByType[materialType].push(baseMaterial);
+        customMaterials.push(baseMaterial);
+      }
+    });
+
+    mixer = new THREE.AnimationMixer(model);
+    gltf.animations.forEach((clip) => {
+      const action = mixer.clipAction(clip);
+      action.loop = THREE.LoopOnce;
+      action.clampWhenFinished = true;
+      actions[clip.name] = action;
+    });
+
+    document.querySelectorAll('#buttons button').forEach((btn, i) => {
+      btn.style.cssText = 'padding:10px 20px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #ccc;border-radius:4px;';
+      btn.addEventListener('click', () => {
+        playAction(animNames[i]);
+      });
+    });
     document.getElementById('btn-left').addEventListener('click', () => {
       setTarget(0);
       // console.log(fireLerp);
