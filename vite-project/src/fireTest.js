@@ -1801,8 +1801,7 @@ envMap.mapping = THREE.EquirectangularReflectionMapping;
 
 scene.environment = envMap;
 scene.environmentRotation.set(0, 0, 0);
-scene.background = envMap;
-// scene.background = new THREE.Color(0xe6cdad);
+scene.background = new THREE.Color('#C5BEB6');
 scene.backgroundBlurriness = 1;
 // scene.backgroundIntensity = 0.9;
 scene.environmentIntensity = 0.8;
