@@ -735,8 +735,8 @@ noiseSpeed : 0.374000017765,
       UV_Y_Sub : 0.0,
       UV_Y_Add : 0.0,
       fireSize : 0.4970000236075,
-      fireSizeVertical : 0.5,
-      fireSpeed : 0.4,
+      fireSizeVertical : 0.2,
+      fireSpeed : 0.42,
       fireSpeedHorizontal : 0.0,
       fireAmount : 1.0,
       fireDensity : 0.8530000405175,
@@ -1405,7 +1405,7 @@ const explosionsMeshObjects = [];
 
 let animLerp = 0;
 let fireLerp = 0;
-let targetLerp = 1;
+let targetLerp = 0;
 
 let mixer;
 let model;
