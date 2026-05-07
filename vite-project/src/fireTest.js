@@ -1251,26 +1251,26 @@ const logStates = {
       glowStrength : 0.02000000095,
     }),
     right_middle: new LogState({
-      logCoal : 0.0,
-      ashAmount : 1.0,
-      ashStrength : 0.042000001995,
+      logCoal : 1.0,
+      ashAmount : 0.619,
+      ashStrength : 0.014,
       burnCol : new THREE.Color('#393939'),
       glowCol : new THREE.Color('#ff3300'),
-      burnAmount : 0.426000020235,
-      burnStrength : 0.178000008455,
-      glowAmount : 0.65200003097,
-      glowStrength : 0.0590000028025,
+      burnAmount : 0.309,
+      burnStrength : 0.178,
+      glowAmount : 1.0,
+      glowStrength : 0.095,
     }),
     right: new LogState({
-      logCoal : 0.0,
-      ashAmount : 0.0,
-      ashStrength : 0.042000001995,
+      logCoal : 1.0,
+      ashAmount : 0.619,
+      ashStrength : 0.014,
       burnCol : new THREE.Color('#393939'),
       glowCol : new THREE.Color('#ff3300'),
-      burnAmount : 0.46800002223,
-      burnStrength : 0.178000008455,
-      glowAmount : 0.65200003097,
-      glowStrength : 0.2110000100225,
+      burnAmount : 0.309,
+      burnStrength : 0.178,
+      glowAmount : 1.0,
+      glowStrength : 0.35,
     }),
   },
 };
@@ -1805,6 +1805,9 @@ scene.background = new THREE.Color('#C5BEB6');
 scene.backgroundBlurriness = 1;
 // scene.backgroundIntensity = 0.9;
 scene.environmentIntensity = 0.8;
+
+const axesHelper = new THREE.AxesHelper( 5 );
+// scene.add( axesHelper );
 
 // Controls
 const controls = new OrbitControls(camera, renderer.domElement);
