@@ -1771,19 +1771,7 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-const ssrPass = new SSRPass({
-  renderer,
-  scene,
-  camera,
-  width: innerWidth,
-  height: innerHeight,
-})
 
-// composer.addPass(ssrPass);
-
-const ssaoPass = new SSAOPass(renderer, camera, innerWidth, innerHeight);
-
-// composer.addPass(ssaoPass);
 
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
