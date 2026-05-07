@@ -1165,7 +1165,7 @@ const logStates = {
       ashAmount : 0.8730000414675,
       ashStrength : 0.274000013015,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.0610000028975,
       burnStrength : 0.066000003135,
       glowAmount : 0.8710000413725,
@@ -1176,7 +1176,7 @@ const logStates = {
       ashAmount : 0.8730000414675,
       ashStrength : 0.274000013015,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.0610000028975,
       burnStrength : 0.066000003135,
       glowAmount : 0.8710000413725,
@@ -1187,33 +1187,33 @@ const logStates = {
       ashAmount : 0.8730000414675,
       ashStrength : 0.274000013015,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.0610000028975,
       burnStrength : 0.066000003135,
       glowAmount : 0.8710000413725,
-      glowStrength : 0.01200000057,
+      glowStrength : 0.004,
     }),
     right_middle: new LogState({
       logCoal : 1.0,
       ashAmount : 0.8730000414675,
       ashStrength : 0.274000013015,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.0610000028975,
       burnStrength : 0.066000003135,
-      glowAmount : 0.9030000428925,
-      glowStrength : 0.0630000029925,
+      glowAmount : 0.903,
+      glowStrength : 0.01,
     }),
     right: new LogState({
       logCoal : 1.0,
       ashAmount : 0.8730000414675,
       ashStrength : 0.274000013015,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.0610000028975,
       burnStrength : 0.066000003135,
-      glowAmount : 0.9030000428925,
-      glowStrength : 0.0630000029925,
+      glowAmount : 0.994,
+      glowStrength : 0.01,
     }),
   },
   ember_bed: {
@@ -1222,7 +1222,7 @@ const logStates = {
       ashAmount : 0.0,
       ashStrength : 0.042000001995,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.46800002223,
       burnStrength : 0.178000008455,
       glowAmount : 0.65200003097,
@@ -1233,7 +1233,7 @@ const logStates = {
       ashAmount : 1.0,
       ashStrength : 0.042000001995,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.426000020235,
       burnStrength : 0.178000008455,
       glowAmount : 0.65200003097,
@@ -1241,36 +1241,36 @@ const logStates = {
     }),
     middle: new LogState({
       logCoal : 0.0,
-      ashAmount : 0.0,
-      ashStrength : 0.042000001995,
+      ashAmount : 0.879,
+      ashStrength : 0.01,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
-      burnAmount : 0.3090000146775,
+      glowCol : new THREE.Color('#ff0000'),
+      burnAmount : 0.239,
       burnStrength : 0.178000008455,
-      glowAmount : 0.6310000299725,
-      glowStrength : 0.02000000095,
+      glowAmount : 0.692,
+      glowStrength : 0.016,
     }),
     right_middle: new LogState({
       logCoal : 1.0,
       ashAmount : 0.619,
       ashStrength : 0.014,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.309,
       burnStrength : 0.178,
-      glowAmount : 1.0,
-      glowStrength : 0.095,
+      glowAmount : 0.949,
+      glowStrength : 0.04,
     }),
     right: new LogState({
       logCoal : 1.0,
       ashAmount : 0.619,
       ashStrength : 0.014,
       burnCol : new THREE.Color('#393939'),
-      glowCol : new THREE.Color('#ff3300'),
+      glowCol : new THREE.Color('#ff0000'),
       burnAmount : 0.309,
       burnStrength : 0.178,
       glowAmount : 1.0,
-      glowStrength : 0.35,
+      glowStrength : 0.095,
     }),
   },
 };
@@ -1405,7 +1405,7 @@ const explosionsMeshObjects = [];
 
 let animLerp = 0;
 let fireLerp = 0;
-let targetLerp = 0;
+let targetLerp = 1;
 
 let mixer;
 let model;
@@ -1770,8 +1770,6 @@ const composer = new EffectComposer(renderer);
 
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
-
-
 
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),

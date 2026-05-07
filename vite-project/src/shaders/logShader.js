@@ -96,7 +96,7 @@ void main() {
 	vec4 albedo_height = texture(logTex, UV);
 	vec3 albedo = adjustHSL(albedo_height.rgb, 1.0, 0.3, 1.3);
 	albedo = mix(albedo, mix(vec3(0.6), vec3(0.7), noise_texture.a), float(logCoal));
-	float height = mix(albedo_height.a, noise_texture.a, float(logCoal));
+	float height = mix(albedo_height.a, noise_texture.g, float(logCoal));
 
 	float burn_mask;
 	float glow_mask;
