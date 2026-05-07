@@ -1259,7 +1259,7 @@ const logStates = {
       burnAmount : 0.309,
       burnStrength : 0.178,
       glowAmount : 0.949,
-      glowStrength : 0.04,
+      glowStrength : 0.1,
     }),
     right: new LogState({
       logCoal : 1.0,
@@ -1270,7 +1270,7 @@ const logStates = {
       burnAmount : 0.309,
       burnStrength : 0.178,
       glowAmount : 1.0,
-      glowStrength : 0.095,
+      glowStrength : 0.2,
     }),
   },
 };
@@ -1773,8 +1773,8 @@ composer.addPass(renderPass);
 
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.1,   // intensity
-  0.3,   // radius
+  0.18,   // intensity
+  0.1,   // radius
   0.8    // threshold
 );
 
