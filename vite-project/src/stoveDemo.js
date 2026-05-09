@@ -17,6 +17,7 @@ import { metalVertexShader, metalFragmentShader } from './shaders/metalShader.js
 import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js';
 import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 
 function playAction(name) {
@@ -1585,7 +1586,7 @@ const stove_dark_mat = new CustomShaderMaterial({
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: stove_dark_uniforms,
-    patchMap: {
+  patchMap: {
   "*": {
     "#include <normal_fragment_maps>": `
       #ifdef USE_NORMALMAP
@@ -1678,8 +1679,6 @@ const coal_uniforms =
       fireLerp
     )
   );
-
-
 
 const coal_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshStandardMaterial,
@@ -1838,6 +1837,9 @@ const bloom = new UnrealBloomPass(
 
 composer.addPass(bloom);
 
+// const outputPass = new OutputPass();
+// composer.addPass( outputPass );
+
 
 const rgbe = new HDRLoader();
 const envMap = await rgbe.loadAsync('/assets/hdri/brown_photostudio_01_2k.hdr');
@@ -1900,8 +1902,7 @@ loader.load(
           baseMaterial = stove_insulation_mat;
 
         } else if (child.material.name === 'insulation_surface_nolight') {
-          materialType = 'stove';
-          baseMaterial = stove_insulation_nolight_mat;
+          child.material = stove_insulation_nolight_mat;
 
         } else if (child.material.name === 'glass') {
           child.material = glass_mat;
@@ -1954,10 +1955,6 @@ loader.load(
     document.querySelector('#btn-12').addEventListener('click', () => {
       playSequence(['step_2', 'step_3']);
     });
-
-    // document.getElementById('btn-12').addEventListener('click', () => {
-    //   playTwoActions('step_2', 'step_3');
-    // });
 
   },
   undefined,

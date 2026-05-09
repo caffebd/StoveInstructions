@@ -17,15 +17,39 @@ import { metalVertexShader, metalFragmentShader } from './shaders/metalShader.js
 import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js';
 import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
+
+let currentAction = null;
+let playedActions = new Set();
 
 function playAction(name) {
-  const action = actions[name];
-  if (!action) {
-    // console.warn(`Animation "${name}" not found. Available:`, Object.keys(actions));
-    return;
+  const nextAction = actions[name];
+  if (!nextAction) return;
+
+  // Freeze all previously played actions (except the one we're about to play)
+  for (const played of playedActions) {
+    if (played !== nextAction) {
+      played.paused = true;                   // Pause to freeze
+      played.time = played.getClip().duration; // Jump to last frame
+      played.clampWhenFinished = true;         // Make sure it doesn't snap back
+      played.setEffectiveWeight(1);
+      played.enabled = true;
+      played.play(); // In case it was stopped before
+    }
   }
-  action.reset().play();
+  
+  // Now handle the new/current action:
+  nextAction.reset();
+  nextAction.setEffectiveWeight(1);
+  nextAction.setEffectiveTimeScale(1);
+  nextAction.fadeIn(0.1);
+  nextAction.play();
+  nextAction.paused = false;
+  playedActions.add(nextAction);
+
+  currentAction = nextAction;
+
   console.log(`Playing: ${name}`);
 }
 function playTwoActions(name1, name2) {
@@ -1397,17 +1421,23 @@ const materialsByType = {
 };
 
 const animNames = [
-  'step_1',
-  'step_2',
-  'step_3',
-  'step_4',
-  'step_5',
+  'step_1',      
+  'step_2',      
+  'step_3',      
+  'step_4',      
+  'step_5',      
   'step_6',      
   'step_7',      
   'step_8',      
   'step_9',      
   'step_10',      
   'step_11',      
+  'positioning_stove',
+  'top_outlet_config',
+  'rear_outlet_config_1',
+  'rear_outlet_config_2',
+  'rear_outlet_config_3',
+  'flue_cage_install',      
 ];
 
 const actions = {};
@@ -1581,11 +1611,11 @@ const stove_dark_uniforms = {
 const stove_dark_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
   normalMap: stoveNormals,
-  specularIntensityMap: stoveMasksAO,
+  // specularIntensityMap: stoveMasksAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: stove_dark_uniforms,
-    patchMap: {
+  patchMap: {
   "*": {
     "#include <normal_fragment_maps>": `
       #ifdef USE_NORMALMAP
@@ -1631,7 +1661,7 @@ const stove_insulation_nolight_uniforms = {
 const stove_insulation_nolight_mat = new CustomShaderMaterial({
   vertexColors: true,
   baseMaterial: THREE.MeshPhysicalMaterial, 
-  specularIntensityMap: stoveMasksAO,
+  // specularIntensityMap: stoveMasksAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: stove_insulation_nolight_uniforms,
@@ -1641,7 +1671,7 @@ const stove_insulation_nolight_mat = new CustomShaderMaterial({
 const stove_insulation_mat = new CustomShaderMaterial({
   vertexColors: true,
   baseMaterial: THREE.MeshPhysicalMaterial, 
-  specularIntensityMap: stoveMasksAO,
+  // specularIntensityMap: stoveMasksAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: stove_insulation_uniforms,
@@ -1678,8 +1708,6 @@ const coal_uniforms =
       fireLerp
     )
   );
-
-
 
 const coal_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshStandardMaterial,
@@ -1760,7 +1788,7 @@ const handle_metal_uniforms = {
 
 const brushed_metal_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial,
-  specularIntensityMap: stoveMasksAO,
+  // specularIntensityMap: stoveMasksAO,
   vertexShader: metalVertexShader,
   fragmentShader: metalFragmentShader,
   uniforms: brushed_metal_uniforms,
@@ -1769,7 +1797,7 @@ const brushed_metal_mat = new CustomShaderMaterial({
 
 const handle_metal_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial,
-  specularIntensityMap: stoveMasksAO,
+  // specularIntensityMap: stoveMasksAO,
   vertexShader: metalVertexShader,
   fragmentShader: metalFragmentShader,
   uniforms: handle_metal_uniforms,
@@ -1793,24 +1821,6 @@ const container = document.getElementById('container');
 const stats = new Stats();
 container.appendChild(stats.dom);
 
-// Slider for targetLerp (0-1)
-const lerpSlider = document.createElement('input');
-lerpSlider.type = 'range';
-lerpSlider.min = '0';
-lerpSlider.max = '1';
-lerpSlider.step = '0.01';
-lerpSlider.value = targetLerp;
-Object.assign(lerpSlider.style, {
-  position: 'fixed',
-  bottom: '20px',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  width: '300px',
-  zIndex: '1000',
-});
-lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)));
-container.appendChild(lerpSlider);
-
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -1829,14 +1839,26 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-const bloom = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.18,   // intensity
-  0.1,   // radius
-  0.8    // threshold
+const ssaoPass = new SSAOPass(
+  scene,
+  camera,
+  window.innerWidth,
+  window.innerHeight,
 );
 
-composer.addPass(bloom);
+composer.addPass(ssaoPass);
+
+// const bloom = new UnrealBloomPass(
+//   new THREE.Vector2(window.innerWidth, window.innerHeight),
+//   0.18,   // intensity
+//   0.1,   // radius
+//   0.8    // threshold
+// );
+
+// composer.addPass(bloom);
+
+const outputPass = new OutputPass();
+composer.addPass( outputPass );
 
 
 const rgbe = new HDRLoader();
@@ -1848,7 +1870,7 @@ scene.environmentRotation.set(0, 0, 0);
 scene.background = new THREE.Color('#C5BEB6');
 scene.backgroundBlurriness = 1;
 // scene.backgroundIntensity = 0.9;
-scene.environmentIntensity = 0.8;
+scene.environmentIntensity = 0.99;
 
 const axesHelper = new THREE.AxesHelper( 5 );
 // scene.add( axesHelper );
@@ -1897,7 +1919,7 @@ loader.load(
 
         } else if (child.material.name === 'insulation_surface') {
           materialType = 'stove';
-          baseMaterial = stove_insulation_mat;
+          baseMaterial = stove_insulation_nolight_mat;
 
         } else if (child.material.name === 'insulation_surface_nolight') {
           materialType = 'stove';
@@ -1943,114 +1965,40 @@ loader.load(
     
     console.log('Available actions:', Object.keys(actions));
 
+    let animIndex = 0;
 
-    document.querySelectorAll('#buttons button').forEach((btn, i) => {
-      btn.style.cssText = 'padding:5px 15px;font-size:15px;cursor:pointer;background:#fff;border:1px solid #ccc;border-radius:4px;';
-      btn.addEventListener('click', () => {
-        playAction(animNames[i]);
-      });
+    function playByIndex(i) {
+      animIndex = (i + animNames.length) % animNames.length; // wrap
+      playAction(animNames[animIndex]);
+    }
+    
+    // Initial (optional)
+    playByIndex(0);
+    
+    document.getElementById("prevBtn").addEventListener("click", () => {
+      playByIndex(animIndex - 1);
+    });
+    
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      playByIndex(animIndex + 1);
     });
 
-    document.querySelector('#btn-12').addEventListener('click', () => {
-      playSequence(['step_2', 'step_3']);
-    });
+
+    // document.querySelectorAll('#buttons button').forEach((btn, i) => {
+    //   btn.style.cssText = 'padding:5px 15px;font-size:15px;cursor:pointer;background:#fff;border:1px solid #ccc;border-radius:4px;';
+    //   btn.addEventListener('click', () => {
+    //     playAction(animNames[i]);
+    //   });
+    // });
+
+    // document.querySelector('#btn-12').addEventListener('click', () => {
+    //   playSequence(['step_2', 'step_3']);
+    // });
 
     // document.getElementById('btn-12').addEventListener('click', () => {
     //   playTwoActions('step_2', 'step_3');
     // });
 
-  },
-  undefined,
-  (error) => { console.error(error); }
-);
-
-loader.load(
-  '/assets/gltf/fire.glb',
-  (gltf) => {
-    model = gltf.scene;
-    model.position.set(0, 0, 0);
-    scene.add(model);
-
-    model.traverse((child) => {
-      let materialType = null;
-      let baseMaterial = null;
-
-      if (!child.isMesh) return;
-
-      if (wood_fire_meshes && coal_fire_meshes && fire_cylinder_meshes && fire_explosion_meshes.has(child.name)){
-        child.castShadow = false;
-        child.receiveShadow = false;
-      };
-
-      if (wood_fire_meshes.has(child.name)){
-        materialType = 'cards';
-        baseMaterial = fire_cards_mat.clone();
-        woodFireMeshObjects.push(child);
-        // child.visible = false;
-
-      } else if (coal_fire_meshes.has(child.name)){
-        materialType = 'cards';
-        baseMaterial = fire_cards_mat.clone();
-        coalFireMeshObjects.push(child);
-        // child.visible = false;
-
-      } else if (fire_cylinder_meshes.has(child.name)){
-        materialType = 'cylinders';
-        baseMaterial = fire_cylinders_mat.clone();
-
-      } else if (fire_explosion_meshes.has(child.name)){
-        materialType = 'explosions';
-        baseMaterial = fire_explosions_mat.clone();
-        explosionsMeshObjects.push(child);
-        // child.visible = false;
-
-      } else if (log_meshes.has(child.name)){
-        materialType = 'log';
-        baseMaterial = log_mat.clone();
-        woodFireMeshObjects.push(child);
-
-      } else if (coal_meshes.has(child.name)){
-        materialType = 'coal';
-        baseMaterial = coal_mat.clone();
-        coalFireMeshObjects.push(child);
-        // child.visible = false;
-
-      } else if (ember_bed_meshes.has(child.name)){
-        materialType = 'ember_bed';
-        baseMaterial = ember_bed_mat.clone();
-
-      };
-
-      if (baseMaterial && materialType) {
-        baseMaterial.uniforms.TIME = { value : 0},
-
-        baseMaterial.uniforms.gradientSpeedDelta = { value: 0 },
-        baseMaterial.uniforms.vtxNoiseSpeedDelta = { value: 0 },
-        baseMaterial.uniforms.fireSpeedDelta = { value: 0 },
-        baseMaterial.uniforms.fireSpeedHDelta = { value: 0 },
-        baseMaterial.uniforms.fireFlickerSpeedDelta = { value: 0 },
-        baseMaterial.uniforms.noiseSpeedDelta = { value: 0 },
-        baseMaterial.uniforms.fireSpeedDelta = { value: 0 },
-
-        
-        baseMaterial.uniforms.noiseTex = { value : noiseTex};
-        baseMaterial.uniforms.gradientTex = { value : gradientTex};
-        baseMaterial.uniforms.logTex = { value : logTex};
-        child.material = baseMaterial;
-
-        materialsByType[materialType].push(baseMaterial);
-        customMaterials.push(baseMaterial);
-      }
-    });
-
-    mixer = new THREE.AnimationMixer(model);
-    gltf.animations.forEach((clip) => {
-      const action = mixer.clipAction(clip);
-      action.loop = THREE.LoopOnce;
-      action.clampWhenFinished = true;
-      actions[clip.name] = action;
-    });
-  
   },
   undefined,
   (error) => { console.error(error); }

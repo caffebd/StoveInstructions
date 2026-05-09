@@ -66,7 +66,7 @@ void main() {
   csm_DiffuseColor = vec4(albedo, 1.0);
   csm_Roughness = rough;
   csm_Metalness = 1.0;
-  csm_AO = 1.0 - ao;
+  // csm_AO = 1.0 - ao;
   
 }
 `;

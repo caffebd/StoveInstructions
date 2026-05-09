@@ -73,7 +73,7 @@ void main() {
 	// -------------- GLSL Specific ---------------------
 	vec3 VERTEX = position;
 	mat4 MODEL_MATRIX = modelMatrix;
-	COLOR = color;
+	// COLOR = color;
 	UV = uv;
 	// --------------------------------------------------
 	objectPos = VERTEX;
@@ -98,17 +98,17 @@ void main() {
 	// float ao = texture(stoveMasksAO, UV).a - 0.07;
 
 
-	float flicker = smoothRandom(objectOrigin, TIME, 8.1);
+	float flicker = smoothRandom(objectOrigin, TIME, 1.0);
 
-	vec3 flame_light = pointLight(objectPos, lightPos, lightCol, lightStrength * mix(0.5, 0.75, flicker), lightRange, lightFalloff);
+	vec3 flame_light = pointLight(objectPos, lightPos, lightCol, lightStrength * mix(0.4, 0.75, flicker), lightRange, lightFalloff);
 	vec3 albedo = vec3(mix(stoveColB, stoveColA, masks.r));
-  	albedo = albedo + (flame_light * COLOR.r);
+  	albedo = albedo + (flame_light * 1.0);
 	float rough = mix(stoveRoughA, stoveRoughB, masks.r);
   	vec3 normal_map = deriveZ(normals.r, normals.g);
 
 	csm_DiffuseColor = vec4(vec3(albedo), 1.0);
 	csm_Roughness = rough;
-	csm_AO = 1.0 - ao;
+	// csm_AO = 1.0 - ao;
 
 
 }
