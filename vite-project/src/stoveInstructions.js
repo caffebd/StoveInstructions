@@ -23,30 +23,22 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 let currentAction = null;
 let playedActions = new Set();
 
+
 function playAction(name) {
   const nextAction = actions[name];
   if (!nextAction) return;
 
-  // Freeze all previously played actions (except the one we're about to play)
-  for (const played of playedActions) {
-    if (played !== nextAction) {
-      played.paused = true;                   // Pause to freeze
-      played.time = played.getClip().duration; // Jump to last frame
-      played.clampWhenFinished = true;         // Make sure it doesn't snap back
-      played.setEffectiveWeight(1);
-      played.enabled = true;
-      played.play(); // In case it was stopped before
-    }
-  }
-  
-  // Now handle the new/current action:
-  nextAction.reset();
-  nextAction.setEffectiveWeight(1);
-  nextAction.setEffectiveTimeScale(1);
-  nextAction.fadeIn(0.1);
-  nextAction.play();
-  nextAction.paused = false;
-  playedActions.add(nextAction);
+  // If something was playing before, remove its influence
+  // if (currentAction && currentAction !== nextAction) {
+  //   currentAction.fadeOut(0.1);           // or: currentAction.stop()
+  // }
+
+  nextAction
+    .reset()
+    .setEffectiveWeight(1)
+    .setEffectiveTimeScale(1)
+    .fadeIn(0.1)                           // optional but recommended
+    .play();
 
   currentAction = nextAction;
 
@@ -529,6 +521,7 @@ loader.load(
         } else if (child.material.name === 'handle') {
           child.material = handle_metal_mat;
         };
+
       }
   
 
@@ -539,7 +532,14 @@ loader.load(
       const action = mixer.clipAction(clip);
       action.loop = THREE.LoopOnce;
       action.clampWhenFinished = true;
+      action.enabled = true;              // keep it evaluatable
       actions[clip.name] = action;
+      animNames.push(clip.name);
+    });
+    
+    mixer.addEventListener("finished", (e) => {
+      e.action.paused = true;             // holds last frame
+      e.action.enabled = true;            // keep its pose applied
     });
     
     console.log('Available actions:', Object.keys(actions));

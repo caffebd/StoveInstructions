@@ -222,7 +222,19 @@ function playAction(name) {
     console.warn(`Animation "${name}" not found. Available:`, Object.keys(actions));
     return;
   }
-  action.reset().play();
+  
+  // Keep other animations playing with weight 0 (frozen at final frame)
+  Object.values(actions).forEach((a) => {
+    if (a !== action) {
+      a.setEffectiveWeight(0);
+      if (!a.isRunning()) {
+        a.play();
+      }
+    }
+  });
+  
+  // Don't reset—just play from current time (should be 0 if never started)
+  action.setEffectiveWeight(1).play();
   console.log(`Playing: ${name}`);
 }
 
