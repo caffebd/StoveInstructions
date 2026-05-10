@@ -101,6 +101,86 @@
         opacity: 0.85;
       }
 
+      #instruction-panel {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: min(420px, calc(100vw - 40px));
+        background: rgba(0, 0, 0, 0.74);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        z-index: 220;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
+      }
+
+      #instruction-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        cursor: grab;
+        touch-action: none;
+      }
+
+      #instruction-panel.dragging #instruction-panel-header {
+        cursor: grabbing;
+      }
+
+      #instruction-panel-title-wrap {
+        min-width: 0;
+      }
+
+      #instruction-step-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      #instruction-title {
+        margin-top: 2px;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      #instruction-collapse-btn {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      #instruction-panel-body {
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 12px 18px 16px;
+      }
+
+      #instruction-bullets {
+        margin: 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #instruction-bullets li {
+        font-size: 14px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      #instruction-panel.collapsed #instruction-panel-body {
+        display: none;
+      }
+
       #buttons button {
         padding: 12px 24px;
         font-size: 14px;
@@ -170,6 +250,18 @@
         #instructions-overlay p {
           font-size: 15px;
         }
+
+        #instruction-panel {
+          width: calc(100vw - 20px);
+          max-width: calc(100vw - 20px);
+          top: 10px;
+          right: 10px;
+          left: 10px;
+        }
+
+        #instruction-title {
+          font-size: 16px;
+        }
       }
 
       @media (max-width: 480px) {
@@ -192,8 +284,23 @@
     <div id="set-selector">
       <button id="setUnpackingBtn" class="active">Unpacking</button>
       <button id="setInstallationBtn">Installation</button>
+      <button id="airControlsBtn">Air Controls</button>
       <!-- <div id="activeSetLabel" class="label">Set: Unpacking</div> -->
     </div>
+    <section id="instruction-panel" aria-live="polite">
+      <div id="instruction-panel-header">
+        <div id="instruction-panel-title-wrap">
+          <div id="instruction-step-label">Step --</div>
+          <h2 id="instruction-title">Unpacking Instructions</h2>
+        </div>
+        <button id="instruction-collapse-btn" type="button" aria-expanded="true">Collapse</button>
+      </div>
+      <div id="instruction-panel-body">
+        <ul id="instruction-bullets">
+          <li>Use Next to begin the selected set.</li>
+        </ul>
+      </div>
+    </section>
     <!-- <div id="instructions-overlay"> -->
       <!-- <h2 id="instruction-heading">Welcome</h2> -->
       <!-- <p id="instruction-text">Click any step button below to see product instructions.</p> -->

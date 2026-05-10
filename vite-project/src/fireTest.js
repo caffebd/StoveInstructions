@@ -6,7 +6,7 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
@@ -2042,7 +2042,7 @@ const bloom = new UnrealBloomPass(
 composer.addPass(bloom);
 
 
-const rgbe = new HDRLoader();
+const rgbe = new RGBELoader();
 const envMap = await rgbe.loadAsync('/assets/hdri/brown_photostudio_01_2k.hdr');
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 

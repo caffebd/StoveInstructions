@@ -6,7 +6,8 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { Timer } from 'three/examples/jsm/misc/Timer.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
@@ -19,10 +20,89 @@ import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js
 import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { cameraValues } from './cameraValues.js';
 
 
 let currentAction = null;
 let playedActions = new Set();
+let activeCameraMoveToken = 0;
+
+function normalizeRotationComponent(value) {
+  return THREE.MathUtils.degToRad(value);
+}
+
+function normalizeRotation(rotation) {
+  return new THREE.Euler(
+    normalizeRotationComponent(rotation.x),
+    normalizeRotationComponent(rotation.y),
+    normalizeRotationComponent(rotation.z),
+    rotation.order || 'XYZ'
+  );
+}
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function moveCameraToStep(setName, stepName, durationMs = 320) {
+  const stepCamera = cameraValues.getStep(setName, stepName);
+  if (!stepCamera) return Promise.resolve(false);
+
+  const token = ++activeCameraMoveToken;
+  const startPosition = camera.position.clone();
+  const endPosition = stepCamera.position.clone();
+  const endRotation = normalizeRotation(stepCamera.rotation);
+  const endQuaternion = new THREE.Quaternion().setFromEuler(endRotation);
+
+  const hasControls = !!controls;
+  const startTarget = hasControls ? controls.target.clone() : null;
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(endQuaternion);
+  const targetDistance = hasControls ? Math.max(camera.position.distanceTo(controls.target), 1) : 1;
+  const endTarget = endPosition.clone().addScaledVector(forward, targetDistance);
+  const startQuaternion = hasControls ? null : camera.quaternion.clone();
+
+  const wasControlsEnabled = hasControls ? controls.enabled : false;
+  if (hasControls) controls.enabled = false;
+
+  return new Promise((resolve) => {
+    const startTime = performance.now();
+
+    const tick = (now) => {
+      if (token !== activeCameraMoveToken) {
+        if (hasControls) controls.enabled = wasControlsEnabled;
+        resolve(false);
+        return;
+      }
+
+      const t = Math.min((now - startTime) / durationMs, 1);
+      const eased = easeOutCubic(t);
+
+      camera.position.lerpVectors(startPosition, endPosition, eased);
+
+      if (hasControls) {
+        controls.target.lerpVectors(startTarget, endTarget, eased);
+        controls.update();
+      } else {
+        camera.quaternion.copy(startQuaternion).slerp(endQuaternion, eased);
+      }
+
+      if (t < 1) {
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      if (hasControls) {
+        controls.target.copy(endTarget);
+        controls.enabled = wasControlsEnabled;
+        controls.update();
+      }
+
+      resolve(true);
+    };
+
+    requestAnimationFrame(tick);
+  });
+}
 
 
 function playAction(name) {
@@ -155,6 +235,195 @@ function animate() {
 function lerp(a, b, t) {
   return a * (1 - t) + b * t;
 }
+
+const instructionCopyBySet = {
+  unpacking: {
+    step_2: {
+      stepNumber: 2,
+      title: 'Lid',
+      bullets: [
+        "Gently lift the lid off the stove and set it aside. Removing the lid reduces weight at the top, improving the stove's stability during transport.",
+      ],
+    },
+    step_3: {
+      stepNumber: 3,
+      title: 'Door',
+      bullets: [
+        'Open the door fully, then lift it up and off its hinges to remove it from the stove.',
+        'Take care not to break the glass. Place the door on a cushioned surface, away from any heavy objects that could impact the glass.',
+      ],
+    },
+    step_4: {
+      stepNumber: 4,
+      title: 'Log Guard',
+      bullets: [
+        'Detach the log guard from the interior of the firebox by lifting it up and tilting it toward you. Set it aside for reassembly.',
+      ],
+    },
+    step_5: {
+      stepNumber: 5,
+      title: 'Ash Pan',
+      bullets: [
+        'Slide the ash pan out from the bottom of the firebox and place it in a secure location.',
+      ],
+    },
+    step_6: {
+      stepNumber: 6,
+      title: 'Baffle Brick',
+      bullets: [
+        'To remove the baffle brick, lift it up at the front to expose the two supporting pins.',
+        'Remove these pins, then carefully slide the baffle brick toward you. Place it aside for later reassembly.',
+      ],
+    },
+    step_7: {
+      stepNumber: 7,
+      title: 'Lining Bricks',
+      bullets: [
+        'Remove the side bricks first, followed by the back bricks. Handle these bricks with care as they can be fragile.',
+      ],
+    },
+    step_8: {
+      stepNumber: 8,
+      title: 'Grate',
+      bullets: [
+        "Lift the grate up and out of the firebox. Set it aside to further reduce the stove's weight.",
+      ],
+    },
+    step_9: {
+      stepNumber: 9,
+      title: 'Convection Side Panels',
+      bullets: [
+        'Detach the convection side panels (if applicable) by unscrewing the fasteners at the top of the stove.',
+        'Slide the panels up to remove them completely.',
+      ],
+    },
+    step_10: {
+      stepNumber: 10,
+      title: 'Heat Shield',
+      bullets: [
+        'Carefully remove the heat shield (if applicable) by unscrewing its fasteners and setting it aside for re-installation.',
+      ],
+    },
+    step_11: {
+      stepNumber: 11,
+      title: 'Blanking Plate',
+      bullets: [
+        'Carefully remove the blanking plate (if applicable) by unscrewing its fasteners and setting it aside for re-installation.',
+      ],
+    },
+  },
+};
+
+const unpackingBookletMaxStep = Object.values(instructionCopyBySet.unpacking)
+  .reduce((max, item) => Math.max(max, item.stepNumber), 0);
+
+function prettifyStepName(stepName) {
+  if (!stepName) return 'Instruction';
+  return stepName
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function createInstructionPanelController() {
+  const panel = document.getElementById('instruction-panel');
+  const header = document.getElementById('instruction-panel-header');
+  const stepLabel = document.getElementById('instruction-step-label');
+  const title = document.getElementById('instruction-title');
+  const bullets = document.getElementById('instruction-bullets');
+  const collapseBtn = document.getElementById('instruction-collapse-btn');
+
+  if (!panel || !header || !stepLabel || !title || !bullets || !collapseBtn) {
+    return {
+      update: () => {},
+    };
+  }
+
+  let isCollapsed = false;
+  let dragPointerId = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  function setCollapsed(nextCollapsed) {
+    isCollapsed = nextCollapsed;
+    panel.classList.toggle('collapsed', isCollapsed);
+    collapseBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
+    collapseBtn.setAttribute('aria-expanded', String(!isCollapsed));
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function startDrag(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest('button')) return;
+
+    const rect = panel.getBoundingClientRect();
+    dragPointerId = event.pointerId;
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    panel.classList.add('dragging');
+
+    const computed = window.getComputedStyle(panel);
+    panel.style.left = `${rect.left}px`;
+    panel.style.top = `${rect.top}px`;
+    panel.style.right = 'auto';
+    if (computed.bottom !== 'auto') {
+      panel.style.bottom = 'auto';
+    }
+
+    header.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  function onDrag(event) {
+    if (dragPointerId !== event.pointerId) return;
+
+    const maxLeft = Math.max(8, window.innerWidth - panel.offsetWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - panel.offsetHeight - 8);
+    const nextLeft = clamp(event.clientX - dragOffsetX, 8, maxLeft);
+    const nextTop = clamp(event.clientY - dragOffsetY, 8, maxTop);
+
+    panel.style.left = `${nextLeft}px`;
+    panel.style.top = `${nextTop}px`;
+  }
+
+  function stopDrag(event) {
+    if (dragPointerId !== event.pointerId) return;
+    header.releasePointerCapture?.(event.pointerId);
+    dragPointerId = null;
+    panel.classList.remove('dragging');
+  }
+
+  collapseBtn.addEventListener('click', () => {
+    setCollapsed(!isCollapsed);
+  });
+
+  header.addEventListener('pointerdown', startDrag);
+  header.addEventListener('pointermove', onDrag);
+  header.addEventListener('pointerup', stopDrag);
+  header.addEventListener('pointercancel', stopDrag);
+
+  function update({ stepText, titleText, bulletItems }) {
+    stepLabel.textContent = stepText;
+    title.textContent = titleText;
+    bullets.innerHTML = '';
+
+    bulletItems.forEach((item) => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      bullets.appendChild(li);
+    });
+  }
+
+  setCollapsed(false);
+
+  return {
+    update,
+  };
+}
+
+const instructionPanel = createInstructionPanelController();
 
 const animationSets = [
   {
@@ -395,7 +664,7 @@ const glass_mat = new THREE.MeshStandardMaterial({
 
 
 // Scene stuff
-const timer = new THREE.Timer();
+const timer = new Timer();
 timer.connect(document);
 
 const container = document.getElementById('container');
@@ -456,11 +725,18 @@ const outputPass = new OutputPass();
 composer.addPass( outputPass );
 
 
-const rgbe = new HDRLoader();
-const envMap = await rgbe.loadAsync('/assets/hdri/brown_photostudio_01_2k.hdr');
-envMap.mapping = THREE.EquirectangularReflectionMapping;
-
-scene.environment = envMap;
+const rgbe = new RGBELoader();
+rgbe.load(
+  '/assets/hdri/brown_photostudio_01_2k.hdr',
+  (envMap) => {
+    envMap.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = envMap;
+  },
+  undefined,
+  (error) => {
+    console.error('Failed to load HDR environment map for stoveInstructions:', error);
+  }
+);
 const environmentBaseRotation = new THREE.Euler(0, 0, 0);
 scene.environmentRotation.copy(environmentBaseRotation);
 scene.background = new THREE.Color('#C5BEB6');
@@ -560,6 +836,7 @@ loader.load(
 
     let currentSetIndex = 0;
     let setAnimIndex = -1;
+    let activePlayToken = 0;
 
     function getActiveSet() {
       return animationSets[currentSetIndex];
@@ -574,47 +851,162 @@ loader.load(
       return setList[(i + setList.length) % setList.length];
     }
 
+    function snapActionToStart(action) {
+      if (!action) return;
+      action.stop();
+      action.reset();
+      action.enabled = true;
+      action.paused = true;
+      action.setEffectiveWeight(1);
+      action.setEffectiveTimeScale(1);
+    }
+
+    function snapActionToEnd(action) {
+      if (!action) return;
+      action.reset();
+      action.enabled = true;
+      action.paused = false;
+      action.setEffectiveWeight(1);
+      action.setEffectiveTimeScale(1);
+      action.play();
+      action.time = action.getClip().duration;
+      action.paused = true;
+    }
+
+    // Rebuild cumulative step state so backward navigation instantly restores later-step parts.
+    function applySetStateAtIndex(order, activeIndex) {
+      order.forEach((name, idx) => {
+        const action = actions[name];
+        if (!action) return;
+        if (idx < activeIndex) {
+          snapActionToEnd(action);
+        } else {
+          snapActionToStart(action);
+        }
+      });
+
+      if (mixer) mixer.update(0);
+    }
+
     function updateSetButtons() {
       document.getElementById('setUnpackingBtn')?.classList.toggle('active', currentSetIndex === 0);
       document.getElementById('setInstallationBtn')?.classList.toggle('active', currentSetIndex === 1);
-      document.getElementById('activeSetLabel').textContent = `Set: ${getActiveSet().label}`;
+      const activeSetLabel = document.getElementById('activeSetLabel');
+      if (activeSetLabel) {
+        activeSetLabel.textContent = `Set: ${getActiveSet().label}`;
+      }
       updateProgressBar();
     }
 
     function getProgressState() {
       const steps = getActiveAnimationOrder().length;
-      const current = setAnimIndex < 0 ? 0 : setAnimIndex + 1;
-      return { current, steps };
+      if (setAnimIndex < 0) {
+        return { current: 0, steps, label: `0 of ${steps} steps` };
+      }
+
+      const stepName = getAnimationName(setAnimIndex);
+      const activeSet = getActiveSet();
+      const unpackingInstruction = instructionCopyBySet[activeSet.key]?.[stepName];
+
+      if (unpackingInstruction) {
+        const current = unpackingInstruction.stepNumber;
+        const total = unpackingBookletMaxStep;
+        return {
+          current,
+          steps: total,
+          label: `Step ${current} of ${total}`,
+        };
+      }
+
+      const current = setAnimIndex + 1;
+      return {
+        current,
+        steps,
+        label: `Step ${current} of ${steps}`,
+      };
     }
 
     function updateProgressBar() {
-      const { current, steps } = getProgressState();
+      const { current, steps, label: progressLabel } = getProgressState();
       const fill = document.getElementById('step-progress-fill');
       const label = document.getElementById('step-progress-label');
       if (fill) {
         fill.style.width = `${(current / steps) * 100}%`;
       }
       if (label) {
-        label.textContent = current > 0 ? `Step ${current} of ${steps}` : `0 of ${steps} steps`;
+        label.textContent = progressLabel;
       }
+    }
+
+    function updateInstructionPanel() {
+      const activeSet = getActiveSet();
+      const activeSetAnimations = getActiveAnimationOrder();
+
+      if (setAnimIndex < 0) {
+        instructionPanel.update({
+          stepText: 'Step --',
+          titleText: `${activeSet.label} Instructions`,
+          bulletItems: ['Use Next to begin the selected set.'],
+        });
+        return;
+      }
+
+      const stepName = getAnimationName(setAnimIndex);
+      const mappedInstruction = instructionCopyBySet[activeSet.key]?.[stepName];
+
+      if (mappedInstruction) {
+        instructionPanel.update({
+          stepText: `Step ${mappedInstruction.stepNumber}`,
+          titleText: mappedInstruction.title,
+          bulletItems: mappedInstruction.bullets,
+        });
+        return;
+      }
+
+      const fallbackNumber = setAnimIndex + 1;
+      instructionPanel.update({
+        stepText: `Step ${fallbackNumber}`,
+        titleText: prettifyStepName(stepName),
+        bulletItems: [
+          `Follow this animation step in the ${activeSet.label.toLowerCase()} sequence (${fallbackNumber} of ${activeSetAnimations.length}).`,
+        ],
+      });
     }
 
     function setActiveSet(index) {
       const nextIndex = (index + animationSets.length) % animationSets.length;
-      if (nextIndex === currentSetIndex) return;
+      if (nextIndex === currentSetIndex) {
+        updateSetButtons();
+        updateInstructionPanel();
+        return;
+      }
 
+      activePlayToken++;
       currentSetIndex = nextIndex;
       setAnimIndex = -1;
       resetAnimations();
       updateSetButtons();
+      updateInstructionPanel();
     }
 
-    function playByIndex(i) {
+    async function playByIndex(i) {
       const order = getActiveAnimationOrder();
       const clampedIndex = Math.max(0, Math.min(i, order.length - 1));
       setAnimIndex = clampedIndex;
-      playAction(getAnimationName(setAnimIndex));
+      const stepName = getAnimationName(setAnimIndex);
+      const requestToken = ++activePlayToken;
+      const activeSetKey = getActiveSet().key;
+
+      applySetStateAtIndex(order, clampedIndex);
+
+      if (activeSetKey !== 'installation') {
+        await moveCameraToStep(activeSetKey, stepName);
+      }
+      if (requestToken !== activePlayToken) return;
+
+      playAction(stepName);
       updateProgressBar();
+      updateInstructionPanel();
     }
 
     function playNext() {
@@ -630,13 +1022,19 @@ loader.load(
     }
     
     // Initial set and animation
-    setActiveSet(0);
+    const initialSetParam = new URLSearchParams(window.location.search).get('set');
+    const initialSetIndex = initialSetParam === 'installation' ? 1 : 0;
+    setActiveSet(initialSetIndex);
     
     document.getElementById('setUnpackingBtn').addEventListener('click', () => {
       setActiveSet(0);
     });
     document.getElementById('setInstallationBtn').addEventListener('click', () => {
       setActiveSet(1);
+    });
+    document.getElementById('airControlsBtn')?.addEventListener('click', () => {
+      renderer.setAnimationLoop(null);
+      window.location.assign('/stoveDemo.html');
     });
     document.getElementById('prevBtn').addEventListener('click', () => {
       playPrevious();
@@ -678,3 +1076,4 @@ window.addEventListener('resize', () => {
 window.playActionLerp = playActionLerp;
 window.actions = actions;
 window.customMaterials = customMaterials;
+

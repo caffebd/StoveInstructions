@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -103,7 +103,7 @@ renderer.toneMapping = THREE.NoToneMapping;
 
 // ─── Sky & Environment ────────────────────────────────────────────────────────
 
-const hdri = new HDRLoader();
+const hdri = new RGBELoader();
 const envMap = await hdri.loadAsync( 'src/assets/hdri/brown_photostudio_06_2k.hdr' );
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 scene.environment = envMap;

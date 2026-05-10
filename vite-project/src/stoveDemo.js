@@ -6,7 +6,8 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { Timer } from 'three/examples/jsm/misc/Timer.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
@@ -18,6 +19,153 @@ import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js
 import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const airControlSections = [
+  {
+    label: 'Section 1 of 3',
+    title: 'Air Controls',
+    summary: 'Your stove features a single air control lever designed to manage airflow for optimal performance, depending on the type of fuel being used. The lever has 6 clicker settings to help fine-tune the airflow and set the appliance correctly for efficient operation.',
+    bullets: [],
+  },
+  {
+    label: 'Section 2 of 3',
+    title: 'For Wood Burning',
+    summary: '',
+    bullets: [
+      'Lever Moved to the Left of Centre: Air is introduced down the glass via the Airwash system. This is the primary setting for burning wood efficiently.',
+      'Ignition Mode: When the control lever is positioned fully to the left (3 clicks from the centre), it allows maximum airflow for ignition or boosting the fire. This mode should only be used when starting or reviving the fire.',
+      'Controlling the Fire: Moving the lever closer to the centre reduces the amount of air entering the appliance. The additional clicker settings are designed to help you adjust airflow precisely for steady combustion and efficient heat output.',
+    ],
+  },
+  {
+    label: 'Section 3 of 3',
+    title: 'For Smokeless Coal Burning',
+    summary: '',
+    bullets: [
+      'Lever Moved to the Right of Centre: A higher volume of air is directed upwards through the grate, which is ideal for burning smokeless fuels that require more airflow for proper combustion.',
+      'Ignition Mode: When the control lever is positioned fully to the right (3 clicks from the centre), it allows maximum airflow for ignition or boosting the fire. This mode should only be used briefly when starting or reviving the fire.',
+      'Controlling the Fire: Gradually moving the lever closer to the centre reduces the airflow for controlled and efficient burning of smokeless fuels.',
+    ],
+  },
+];
+
+function createAirControlPanelController() {
+  const panel = document.getElementById('instruction-panel');
+  const header = document.getElementById('instruction-panel-header');
+  const collapseBtn = document.getElementById('instruction-collapse-btn');
+  const stepLabel = document.getElementById('instruction-step-label');
+  const title = document.getElementById('instruction-title');
+  const summary = document.getElementById('instruction-summary');
+  const bullets = document.getElementById('instruction-bullets');
+  const prevBtn = document.getElementById('instruction-prev-btn');
+  const nextBtn = document.getElementById('instruction-next-btn');
+
+  if (!panel || !header || !collapseBtn || !stepLabel || !title || !summary || !bullets || !prevBtn || !nextBtn) {
+    return;
+  }
+
+  let isCollapsed = false;
+  let dragPointerId = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let index = 0;
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function setCollapsed(nextCollapsed) {
+    isCollapsed = nextCollapsed;
+    panel.classList.toggle('collapsed', isCollapsed);
+    collapseBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
+    collapseBtn.setAttribute('aria-expanded', String(!isCollapsed));
+  }
+
+  function startDrag(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest('button')) return;
+
+    const rect = panel.getBoundingClientRect();
+    dragPointerId = event.pointerId;
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    panel.classList.add('dragging');
+
+    const computed = window.getComputedStyle(panel);
+    panel.style.left = `${rect.left}px`;
+    panel.style.top = `${rect.top}px`;
+    panel.style.right = 'auto';
+    if (computed.bottom !== 'auto') {
+      panel.style.bottom = 'auto';
+    }
+
+    header.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  function onDrag(event) {
+    if (dragPointerId !== event.pointerId) return;
+
+    const maxLeft = Math.max(8, window.innerWidth - panel.offsetWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - panel.offsetHeight - 8);
+    const nextLeft = clamp(event.clientX - dragOffsetX, 8, maxLeft);
+    const nextTop = clamp(event.clientY - dragOffsetY, 8, maxTop);
+
+    panel.style.left = `${nextLeft}px`;
+    panel.style.top = `${nextTop}px`;
+  }
+
+  function stopDrag(event) {
+    if (dragPointerId !== event.pointerId) return;
+    header.releasePointerCapture?.(event.pointerId);
+    dragPointerId = null;
+    panel.classList.remove('dragging');
+  }
+
+  function render() {
+    const section = airControlSections[index];
+    stepLabel.textContent = section.label;
+    title.textContent = section.title;
+    summary.textContent = section.summary;
+    summary.style.display = section.summary ? 'block' : 'none';
+
+    bullets.innerHTML = '';
+    section.bullets.forEach((item) => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      bullets.appendChild(li);
+    });
+
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === airControlSections.length - 1;
+  }
+
+  prevBtn.addEventListener('click', () => {
+    if (index === 0) return;
+    index -= 1;
+    render();
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (index === airControlSections.length - 1) return;
+    index += 1;
+    render();
+  });
+
+  collapseBtn.addEventListener('click', () => {
+    setCollapsed(!isCollapsed);
+  });
+
+  header.addEventListener('pointerdown', startDrag);
+  header.addEventListener('pointermove', onDrag);
+  header.addEventListener('pointerup', stopDrag);
+  header.addEventListener('pointercancel', stopDrag);
+
+  setCollapsed(false);
+  render();
+}
+
+createAirControlPanelController();
 
 
 function playAction(name) {
@@ -2005,8 +2153,20 @@ const glass_mat = new THREE.MeshStandardMaterial({
 
 
 // Scene stuff
-const timer = new THREE.Timer();
+const timer = new Timer();
 timer.connect(document);
+
+document.getElementById('setUnpackingBtn')?.addEventListener('click', () => {
+  window.location.assign('/index.html?set=unpacking');
+});
+
+document.getElementById('setInstallationBtn')?.addEventListener('click', () => {
+  window.location.assign('/index.html?set=installation');
+});
+
+document.getElementById('airControlsBtn')?.addEventListener('click', () => {
+  window.location.assign('/stoveDemo.html');
+});
 
 const container = document.getElementById('container');
 
@@ -2070,11 +2230,18 @@ const outputPass = new OutputPass();
 composer.addPass( outputPass );
 
 
-const rgbe = new HDRLoader();
-const envMap = await rgbe.loadAsync('/assets/hdri/brown_photostudio_01_2k.hdr');
-envMap.mapping = THREE.EquirectangularReflectionMapping;
-
-scene.environment = envMap;
+const rgbe = new RGBELoader();
+rgbe.load(
+  '/assets/hdri/brown_photostudio_01_2k.hdr',
+  (envMap) => {
+    envMap.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = envMap;
+  },
+  undefined,
+  (error) => {
+    console.error('Failed to load HDR environment map for stoveDemo:', error);
+  }
+);
 scene.environmentRotation.set(0, 0, 0);
 scene.background = new THREE.Color('#C5BEB6');
 scene.backgroundBlurriness = 1;
@@ -2189,7 +2356,8 @@ loader.load(
       });
     });
 
-    document.querySelector('#btn-12').addEventListener('click', () => {
+    const demoSequenceBtn = document.querySelector('#btn-12');
+    demoSequenceBtn?.addEventListener('click', () => {
       playSequence(['step_2', 'step_3']);
     });
 

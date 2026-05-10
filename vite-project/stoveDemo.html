@@ -49,6 +49,148 @@
         -webkit-touch-callout: none;
       }
 
+      #set-selector {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 150;
+      }
+
+      #set-selector button {
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        transition: background 0.2s, transform 0.2s;
+        min-width: 150px;
+        text-align: left;
+      }
+
+      #set-selector button.active {
+        background: rgba(50, 115, 235, 0.95);
+        color: #fff;
+        transform: scale(1.02);
+      }
+
+      #set-selector button:hover {
+        background: rgba(255, 255, 255, 1);
+      }
+
+      #instruction-panel {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: min(460px, calc(100vw - 40px));
+        background: rgba(0, 0, 0, 0.74);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        z-index: 220;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
+      }
+
+      #instruction-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        cursor: grab;
+        touch-action: none;
+      }
+
+      #instruction-panel.dragging #instruction-panel-header {
+        cursor: grabbing;
+      }
+
+      #instruction-panel-title-wrap {
+        min-width: 0;
+      }
+
+      #instruction-step-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      #instruction-title {
+        margin-top: 2px;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      #instruction-panel-body {
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 12px 18px 16px;
+      }
+
+      #instruction-summary {
+        margin: 0 0 10px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      #instruction-bullets {
+        margin: 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #instruction-bullets li {
+        font-size: 14px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      #instruction-panel-nav {
+        margin-top: 14px;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      #instruction-panel-nav button {
+        flex: 1;
+        padding: 10px 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.9);
+        color: #141414;
+        font-size: 13px;
+      }
+
+      #instruction-panel-nav button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      #instruction-collapse-btn {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      #instruction-panel.collapsed #instruction-panel-body {
+        display: none;
+      }
+
       #buttons button {
         padding: 12px 24px;
         font-size: 14px;
@@ -114,6 +256,18 @@
           min-width: 70px;
         }
 
+        #instruction-panel {
+          width: calc(100vw - 20px);
+          max-width: calc(100vw - 20px);
+          top: 10px;
+          right: 10px;
+          left: 10px;
+        }
+
+        #instruction-title {
+          font-size: 16px;
+        }
+
         #instructions-overlay {
           top: 10px;
           left: 10px;
@@ -148,6 +302,28 @@
     <!-- <button onclick="playAction('DoorOpen')">Open Door</button>
     <button onclick="playAction('DoorClose')">Close Door</button> -->
     <div id="container"></div>
+    <div id="set-selector">
+      <button id="setUnpackingBtn">Unpacking</button>
+      <button id="setInstallationBtn">Installation</button>
+      <button id="airControlsBtn" class="active">Air Controls</button>
+    </div>
+    <section id="instruction-panel" aria-live="polite">
+      <div id="instruction-panel-header">
+        <div id="instruction-panel-title-wrap">
+          <div id="instruction-step-label">Section 1 of 3</div>
+          <h2 id="instruction-title">Air Controls</h2>
+        </div>
+        <button id="instruction-collapse-btn" type="button" aria-expanded="true">Collapse</button>
+      </div>
+      <div id="instruction-panel-body">
+        <p id="instruction-summary"></p>
+        <ul id="instruction-bullets"></ul>
+        <div id="instruction-panel-nav">
+          <button id="instruction-prev-btn" type="button">Previous</button>
+          <button id="instruction-next-btn" type="button">Next</button>
+        </div>
+      </div>
+    </section>
     <!-- <div id="instructions-overlay"> -->
       <!-- <h2 id="instruction-heading">Welcome</h2> -->
       <!-- <p id="instruction-text">Click any step button below to see product instructions.</p> -->
