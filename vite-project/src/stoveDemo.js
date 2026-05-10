@@ -165,7 +165,12 @@ customMaterials.forEach(mat => {
   stats.end();
 }
 function setTarget(value) {
-  targetLerp = value;
+  const clampedValue = THREE.MathUtils.clamp(value, 0, 1);
+  targetLerp = clampedValue;
+
+  if (lerpSlider) {
+    lerpSlider.value = String(clampedValue);
+  }
 }
 function updateLerp(deltaTime) {
   if (Math.abs(targetLerp - animLerp) < 0.001) return;
@@ -1468,6 +1473,184 @@ let targetLerp = 0;
 
 let mixer;
 let model;
+let stoveModel;
+let lerpSlider;
+
+const leverPickTargets = [];
+const leverNodeNames = new Set();
+const leverPointerRaycaster = new THREE.Raycaster();
+const leverPointerNdc = new THREE.Vector2();
+
+let leverDragActive = false;
+let leverDragPointerId = null;
+let leverLastClientX = 0;
+
+const LEVER_DRAG_SENSITIVITY = 1 / 250;
+
+function extractClipNodeNames(clip) {
+  const names = new Set();
+  if (!clip || !Array.isArray(clip.tracks)) return names;
+
+  clip.tracks.forEach((track) => {
+    const path = String(track.name || '').split('.')[0];
+    path.split('/').forEach((segment) => {
+      const cleaned = segment.replace(/\[[^\]]+\]/g, '').trim();
+      if (cleaned) names.add(cleaned);
+    });
+  });
+
+  return names;
+}
+
+function isLikelyLeverName(name) {
+  const n = String(name || '').toLowerCase();
+  return /(lever|air|damper|intake|control|slider)/.test(n);
+}
+
+function isLeverMesh(mesh) {
+  let current = mesh;
+  while (current) {
+    if (leverNodeNames.has(current.name) || isLikelyLeverName(current.name)) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function registerLeverDragTargets(stoveRoot, animations) {
+  leverPickTargets.length = 0;
+  leverNodeNames.clear();
+
+  const stoveLeverClip = animations.find((clip) => clip.name === 'stove_lever');
+  const clipNames = extractClipNodeNames(stoveLeverClip);
+  clipNames.forEach((name) => leverNodeNames.add(name));
+
+  stoveRoot.traverse((child) => {
+    if (!child.isMesh) return;
+    if (isLeverMesh(child)) {
+      leverPickTargets.push(child);
+    }
+  });
+
+  addLeverHoleDragCollider(stoveRoot);
+}
+
+function addLeverHoleDragCollider(stoveRoot) {
+  const leverMesh = leverPickTargets.find((m) => isLikelyLeverName(m.name)) || leverPickTargets[0];
+  if (!leverMesh || !leverMesh.geometry) return;
+
+  if (!leverMesh.geometry.boundingBox) {
+    leverMesh.geometry.computeBoundingBox();
+  }
+
+  const bounds = leverMesh.geometry.boundingBox;
+  if (!bounds) return;
+
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  bounds.getSize(size);
+  bounds.getCenter(center);
+
+  const majorAxis = (size.x >= size.y && size.x >= size.z)
+    ? 'x'
+    : (size.y >= size.z ? 'y' : 'z');
+
+  const holeOffset = size[majorAxis] * 0.42;
+  const holeRadius = Math.max(0.007, Math.min(size.x, size.y, size.z) * 0.7);
+
+  const tipA = center.clone();
+  const tipB = center.clone();
+  tipA[majorAxis] += holeOffset;
+  tipB[majorAxis] -= holeOffset;
+
+  addLeverDragCollider(leverMesh, tipA, holeRadius);
+  addLeverDragCollider(leverMesh, tipB, holeRadius * 0.9);
+}
+
+function addLeverDragCollider(leverMesh, position, radius) {
+  const colliderGeometry = new THREE.SphereGeometry(radius, 14, 12);
+  const colliderMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  const collider = new THREE.Mesh(colliderGeometry, colliderMaterial);
+  collider.name = 'lever_drag_collider';
+  collider.position.copy(position);
+  leverMesh.add(collider);
+  leverPickTargets.push(collider);
+}
+
+function setLeverPointerNdc(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  leverPointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  leverPointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function isPointerOverLever(event) {
+  if (!stoveModel || leverPickTargets.length === 0) return false;
+
+  setLeverPointerNdc(event);
+  leverPointerRaycaster.setFromCamera(leverPointerNdc, camera);
+  const hits = leverPointerRaycaster.intersectObjects(leverPickTargets, true);
+  return hits.length > 0;
+}
+
+function stopLeverDragging() {
+  if (!leverDragActive) return;
+  leverDragActive = false;
+  leverDragPointerId = null;
+  controls.enabled = true;
+  renderer.domElement.style.cursor = '';
+}
+
+function setupLeverDragInteraction() {
+  const canvas = renderer.domElement;
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (!isPointerOverLever(event)) return;
+
+    leverDragActive = true;
+    leverDragPointerId = event.pointerId;
+    leverLastClientX = event.clientX;
+    controls.enabled = false;
+    canvas.style.cursor = 'grabbing';
+    canvas.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', (event) => {
+    if (!leverDragActive) {
+      canvas.style.cursor = isPointerOverLever(event) ? 'grab' : '';
+      return;
+    }
+
+    if (event.pointerId !== leverDragPointerId) return;
+
+    const deltaX = event.clientX - leverLastClientX;
+    leverLastClientX = event.clientX;
+    setTarget(targetLerp + deltaX * LEVER_DRAG_SENSITIVITY);
+    event.preventDefault();
+  });
+
+  canvas.addEventListener('pointerup', (event) => {
+    if (event.pointerId !== leverDragPointerId) return;
+    canvas.releasePointerCapture?.(event.pointerId);
+    stopLeverDragging();
+  });
+
+  canvas.addEventListener('pointercancel', stopLeverDragging);
+  canvas.addEventListener('pointerleave', () => {
+    if (!leverDragActive) {
+      canvas.style.cursor = '';
+    }
+  });
+}
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -1819,7 +2002,7 @@ const stats = new Stats();
 container.appendChild(stats.dom);
 
 // Slider for targetLerp (0-1)
-const lerpSlider = document.createElement('input');
+lerpSlider = document.createElement('input');
 lerpSlider.type = 'range';
 lerpSlider.min = '0';
 lerpSlider.max = '1';
@@ -1892,6 +2075,7 @@ controls.mouseButtons = {
 };
 
 controls.update();
+setupLeverDragInteraction();
 
 renderer.setAnimationLoop(animate);
 
@@ -1905,6 +2089,7 @@ loader.load(
   '/assets/gltf/stove.glb',
   (gltf) => {
     model = gltf.scene;
+    stoveModel = gltf.scene;
     model.position.set(0, 0, 0);
     scene.add(model);
     
@@ -1973,6 +2158,8 @@ loader.load(
     });
     
     console.log('Available actions:', Object.keys(actions));
+
+    registerLeverDragTargets(stoveModel, gltf.animations);
 
 
     document.querySelectorAll('#buttons button').forEach((btn, i) => {
