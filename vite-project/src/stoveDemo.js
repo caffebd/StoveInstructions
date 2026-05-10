@@ -2015,6 +2015,10 @@ Object.assign(lerpSlider.style, {
   transform: 'translateX(-50%)',
   width: '300px',
   zIndex: '1000',
+  userSelect: 'none',
+  webkitUserSelect: 'none',
+  webkitTouchCallout: 'none',
+  touchAction: 'none',
 });
 lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)));
 container.appendChild(lerpSlider);
@@ -2029,6 +2033,10 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.domElement.style.touchAction = 'none';
+renderer.domElement.style.userSelect = 'none';
+renderer.domElement.style.webkitUserSelect = 'none';
+renderer.domElement.style.webkitTouchCallout = 'none';
 
 container.appendChild(renderer.domElement);
 
