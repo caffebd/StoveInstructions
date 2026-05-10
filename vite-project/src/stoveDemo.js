@@ -1566,7 +1566,7 @@ const fire_explosions_mat = new THREE.ShaderMaterial({
   depthTest : true,
 })
 
-const stove_dark_uniforms = {
+const cast_iron_uniforms = {
   TIME:           { value: 0.0 },
   lightCol:       { value: new THREE.Color('#ff4400') },
   lightStrength:  { value: 0.0 },
@@ -1579,13 +1579,13 @@ const stove_dark_uniforms = {
   stoveRoughB:    { value: 0.457 },
 }; 
 
-const stove_dark_mat = new CustomShaderMaterial({
+const cast_iron_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
   normalMap: stoveNormals,
   specularIntensityMap: stoveMasksAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
-  uniforms: stove_dark_uniforms,
+  uniforms: cast_iron_uniforms,
   patchMap: {
   "*": {
     "#include <normal_fragment_maps>": `
@@ -1601,6 +1601,30 @@ const stove_dark_mat = new CustomShaderMaterial({
     `
     }
   },
+  side: THREE.FrontSide,
+  vertexColors: true,
+});
+
+const stove_body_uniforms = {
+  TIME:           { value: 0.0 },
+  lightCol:       { value: new THREE.Color('#ff4400') },
+  lightStrength:  { value: 0.0 },
+  lightPos:       { value: new THREE.Vector3(0.0, 0.018, 0.0) },
+  lightRange:     { value: 0.31 },
+  lightFalloff:   { value: 1.27 },
+  stoveColA:      { value: new THREE.Color('#171615') },
+  stoveColB:      { value: new THREE.Color('#171615') },
+  stoveRoughA:    { value: 0.4 },
+  stoveRoughB:    { value: 0.5 },
+}; 
+
+const stove_body_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshPhysicalMaterial, 
+  normalMap: stoveNormals,
+  // specularIntensityMap: stoveMasksAO,
+  vertexShader: stoveBodyVertexShader,
+  fragmentShader: stoveBodyFragmentShader,
+  uniforms: stove_body_uniforms,
   side: THREE.FrontSide,
   vertexColors: true,
 });
@@ -1895,7 +1919,7 @@ loader.load(
       if (child.isMesh) {
         
         if (child.material.name === 'dark_surface') {
-          child.material = stove_dark_mat.clone();
+          child.material = cast_iron_mat.clone();
 
         } else if (child.material.name === 'insulation_surface') {
           materialType = 'stove';
