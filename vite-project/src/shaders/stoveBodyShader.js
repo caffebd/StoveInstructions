@@ -101,7 +101,7 @@ void main() {
 
 	vec3 flame_light = pointLight(objectPos, lightPos, lightCol, lightStrength * mix(0.4, 0.75, flicker), lightRange, lightFalloff);
 	vec3 albedo = vec3(mix(stoveColB, stoveColA, masks.r - 0.4));
-  	albedo = albedo + (flame_light * 1.0);
+  	// albedo = albedo + (flame_light * 1.0);
 	float rough = mix(stoveRoughA, stoveRoughB, masks.r);
 
 	csm_DiffuseColor = vec4(vec3(albedo), 1.0);

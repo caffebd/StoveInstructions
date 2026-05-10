@@ -1566,23 +1566,26 @@ const fire_explosions_mat = new THREE.ShaderMaterial({
   depthTest : true,
 })
 
+
 const cast_iron_uniforms = {
+  stoveMasksAO: { value: stoveMasksAO },
   TIME:           { value: 0.0 },
   lightCol:       { value: new THREE.Color('#ff4400') },
   lightStrength:  { value: 0.0 },
   lightPos:       { value: new THREE.Vector3(0.0, 0.018, 0.0) },
   lightRange:     { value: 0.31 },
   lightFalloff:   { value: 1.27 },
-  stoveColA:      { value: new THREE.Color('#383334') },
-  stoveColB:      { value: new THREE.Color('#171615') },
-  stoveRoughA:    { value: 0.329 },
-  stoveRoughB:    { value: 0.457 },
+  stoveColA:      { value: new THREE.Color('#333333') },
+  stoveColB:      { value: new THREE.Color('#141414') },
+  stoveRoughA:    { value: 0.6 },
+  stoveRoughB:    { value: 0.7 },
 }; 
 
 const cast_iron_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
   normalMap: stoveNormals,
-  specularIntensityMap: stoveMasksAO,
+  // normalScale: 0.0,
+  // specularIntensityMap: stoveMasksAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: cast_iron_uniforms,
@@ -1601,26 +1604,25 @@ const cast_iron_mat = new CustomShaderMaterial({
     `
     }
   },
-  side: THREE.FrontSide,
-  vertexColors: true,
 });
 
 const stove_body_uniforms = {
+  stoveMasksAO: { value: stoveMasksAO },
   TIME:           { value: 0.0 },
   lightCol:       { value: new THREE.Color('#ff4400') },
   lightStrength:  { value: 0.0 },
   lightPos:       { value: new THREE.Vector3(0.0, 0.018, 0.0) },
   lightRange:     { value: 0.31 },
   lightFalloff:   { value: 1.27 },
-  stoveColA:      { value: new THREE.Color('#171615') },
-  stoveColB:      { value: new THREE.Color('#171615') },
-  stoveRoughA:    { value: 0.4 },
-  stoveRoughB:    { value: 0.5 },
+  stoveColA:      { value: new THREE.Color('#131313') },
+  stoveColB:      { value: new THREE.Color('#131313') },
+  stoveRoughA:    { value: 0.6 },
+  stoveRoughB:    { value: 0.6 },
 }; 
 
 const stove_body_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
-  normalMap: stoveNormals,
+  // normalMap: stoveNormals,
   // specularIntensityMap: stoveMasksAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
@@ -1861,8 +1863,8 @@ const bloom = new UnrealBloomPass(
 
 composer.addPass(bloom);
 
-// const outputPass = new OutputPass();
-// composer.addPass( outputPass );
+const outputPass = new OutputPass();
+composer.addPass( outputPass );
 
 
 const rgbe = new HDRLoader();
@@ -1918,8 +1920,12 @@ loader.load(
       
       if (child.isMesh) {
         
-        if (child.material.name === 'dark_surface') {
-          child.material = cast_iron_mat.clone();
+        if (child.material.name === 'cast_iron') {
+          child.material = cast_iron_mat;
+
+        } else if (child.material.name === 'stove_body') {
+          child.material = stove_body_mat;
+          child.material.dithering = true;
 
         } else if (child.material.name === 'insulation_surface') {
           materialType = 'stove';

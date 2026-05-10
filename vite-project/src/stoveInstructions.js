@@ -529,10 +529,6 @@ loader.load(
         } else if (child.material.name === 'handle') {
           child.material = handle_metal_mat;
         };
-
-        // child.material.uniforms.TIME = { value : 0};
-        // child.material.uniforms.stoveMasksAO = { value : stoveMasksAO};
-        // child.material.uniforms.stoveNormals = { value : stoveNormals};
       }
   
 
