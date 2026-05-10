@@ -139,6 +139,15 @@ function animate() {
   if (mixer) mixer.update(delta);
   if (controls) controls.update();
 
+  if (scene.environmentRotation) {
+    scene.environmentRotation.set(
+      camera.rotation.x + environmentBaseRotation.x,
+      camera.rotation.y + environmentBaseRotation.y,
+      camera.rotation.z + environmentBaseRotation.z,
+      camera.rotation.order
+    );
+  }
+
   composer.render();
 
   stats.end();
@@ -343,8 +352,8 @@ const brushed_metal_uniforms = {
   TIME: { value: 1.0 },
   stoveMasksAO:   { value: stoveMasksAO },
   maskSelect: { value: 1 },
-  stoveColorA: { value: new THREE.Color('#d4d4d4') },
-  stoveColorB: { value: new THREE.Color('#acacac') },
+  stoveColorA: { value: new THREE.Color('#959595') },
+  stoveColorB: { value: new THREE.Color('#888888') },
   stoveRoughA: { value: 0.341 },
   stoveRoughB: { value: 0.103 },
 }
@@ -452,7 +461,8 @@ const envMap = await rgbe.loadAsync('/assets/hdri/brown_photostudio_01_2k.hdr');
 envMap.mapping = THREE.EquirectangularReflectionMapping;
 
 scene.environment = envMap;
-scene.environmentRotation.set(0, 0, 0);
+const environmentBaseRotation = new THREE.Euler(0, 0, 0);
+scene.environmentRotation.copy(environmentBaseRotation);
 scene.background = new THREE.Color('#C5BEB6');
 scene.backgroundBlurriness = 1;
 // scene.backgroundIntensity = 0.9;
