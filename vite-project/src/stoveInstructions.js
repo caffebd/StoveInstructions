@@ -6,7 +6,6 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { Timer } from 'three/examples/jsm/misc/Timer.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
@@ -664,8 +663,13 @@ const glass_mat = new THREE.MeshStandardMaterial({
 
 
 // Scene stuff
-const timer = new Timer();
-timer.connect(document);
+const clock = new THREE.Clock();
+const timer = {
+  update() {},
+  getDelta() {
+    return clock.getDelta();
+  },
+};
 
 const container = document.getElementById('container');
 
