@@ -9,6 +9,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { ReflectorForSSRPass } from 'three/addons/objects/ReflectorForSSRPass.js';
 import { fireVertexShader, fireFragmentShader } from './shaders/fireShader.js';
 import { logVertexShader, logFragmentShader } from './shaders/logShader.js';
@@ -134,32 +135,6 @@ function animate() {
   timer.update();
 
   const delta = timer.getDelta();
-
-customMaterials.forEach(mat => {
-  if (mat.uniforms.TIME) {
-    mat.uniforms.TIME.value += delta;
-  }
-
-  const integrate = (phaseName, speedName, minSpeed = 0.0, maxSpeed = 3.0) => {
-    const phaseU = mat.uniforms[phaseName];
-    const speedU = mat.uniforms[speedName];
-    if (!phaseU || !speedU) return;
-
-    const t = Number(speedU.value);           // expected 0..1 blend
-    if (!Number.isFinite(t)) return;
-
-    const speed = minSpeed + (maxSpeed - minSpeed) * t; // lerp
-    phaseU.value += delta * speed;
-  };
-
-  // one accumulator per effect
-  integrate("gradientSpeedDelta",  "gradientSpeed",  0.0, 1.0);
-  integrate("vtxNoiseSpeedDelta",  "vtxNoiseSpeed",  0.0, 1.0);
-  integrate("fireSpeedDelta",  "fireSpeed",  0.0, 3.0);
-  integrate("fireSpeedHDelta",  "fireSpeedH",  0.0, 3.0);
-  integrate("fireFlickerSpeedDelta",  "fireFlickerSpeed",  0.0, 20.0);
-  integrate("noiseSpeedDelta",  "noiseSpeed",  0.0, 3.0);
-});
   
   if (mixer) mixer.update(delta);
   if (controls) controls.update();
@@ -172,26 +147,43 @@ function lerp(a, b, t) {
   return a * (1 - t) + b * t;
 }
 
-const animNames = [
-  'step_1',      
-  'step_2',      
-  'step_3',      
-  'step_4',      
-  'step_5',      
-  'step_6',      
-  'step_7',      
-  'step_8',      
-  'step_9',      
-  'step_10',      
-  'step_11',      
-  'positioning_stove',
-  'top_outlet_config',
-  'rear_outlet_config_1',
-  'rear_outlet_config_2',
-  'rear_outlet_config_3',
-  'flue_cage_install',      
+const animationSets = [
+  {
+    key: 'unpacking',
+    label: 'Unpacking',
+    animations: [
+      // 'step_1',
+      'step_2',
+      'step_3',
+      'step_4',
+      'step_5',
+      'step_6',
+      'step_7',
+      'step_8',
+      'step_9',
+      'step_10',
+      'step_11',
+    ],
+  },
+  {
+    key: 'installation',
+    label: 'Installation',
+    animations: [
+      'step_3',
+      'step_6',
+      'step_10',
+      'step_11',
+      'positioning_stove',
+      'top_outlet_config',
+      'rear_outlet_config_1',
+      'rear_outlet_config_2',
+      'rear_outlet_config_3',
+      'flue_cage_install',
+    ],
+  },
 ];
 
+const animNames = [];
 const actions = {};
 const finishedActions = new Set();
 const customMaterials = [];
@@ -401,13 +393,17 @@ const container = document.getElementById('container');
 
 const stats = new Stats();
 container.appendChild(stats.dom);
+stats.dom.style.position = 'absolute';
+stats.dom.style.top = '10px';
+stats.dom.style.right = '10px';
+stats.dom.style.left = 'auto';
 
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
 camera.position.set(0.5, 0.1, 1.5);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer();
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -420,6 +416,8 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
+composer.setSize(window.innerWidth, window.innerHeight);
+
 const ssaoPass = new SSAOPass(
   scene,
   camera,
@@ -427,7 +425,11 @@ const ssaoPass = new SSAOPass(
   window.innerHeight,
 );
 
-// composer.addPass(ssaoPass);
+ssaoPass.kernelRadius = 0.5;
+ssaoPass.minDistance = 0.001;
+ssaoPass.maxDistance = 0.1;
+
+composer.addPass(ssaoPass);
 
 // const bloom = new UnrealBloomPass(
 //   new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -437,6 +439,9 @@ const ssaoPass = new SSAOPass(
 // );
 
 // composer.addPass(bloom);
+
+const smaaPass = new SMAAPass(window.innerWidth, window.innerHeight);
+composer.addPass(smaaPass);
 
 const outputPass = new OutputPass();
 composer.addPass( outputPass );
@@ -487,8 +492,7 @@ loader.load(
     model.traverse((child) => {
       if (!child.isMesh) return;
 
-      const oldMat = child.material;
-      oldMat.dispose();
+      child.material.dispose();
 
       
       if (child.isMesh) {
@@ -544,22 +548,91 @@ loader.load(
     
     console.log('Available actions:', Object.keys(actions));
 
-    let animIndex = 0;
+    let currentSetIndex = 0;
+    let setAnimIndex = -1;
+
+    function getActiveSet() {
+      return animationSets[currentSetIndex];
+    }
+
+    function getActiveAnimationOrder() {
+      return getActiveSet().animations;
+    }
+
+    function getAnimationName(i) {
+      const setList = getActiveAnimationOrder();
+      return setList[(i + setList.length) % setList.length];
+    }
+
+    function updateSetButtons() {
+      document.getElementById('setUnpackingBtn')?.classList.toggle('active', currentSetIndex === 0);
+      document.getElementById('setInstallationBtn')?.classList.toggle('active', currentSetIndex === 1);
+      document.getElementById('activeSetLabel').textContent = `Set: ${getActiveSet().label}`;
+      updateProgressBar();
+    }
+
+    function getProgressState() {
+      const steps = getActiveAnimationOrder().length;
+      const current = setAnimIndex < 0 ? 0 : setAnimIndex + 1;
+      return { current, steps };
+    }
+
+    function updateProgressBar() {
+      const { current, steps } = getProgressState();
+      const fill = document.getElementById('step-progress-fill');
+      const label = document.getElementById('step-progress-label');
+      if (fill) {
+        fill.style.width = `${(current / steps) * 100}%`;
+      }
+      if (label) {
+        label.textContent = current > 0 ? `Step ${current} of ${steps}` : `0 of ${steps} steps`;
+      }
+    }
+
+    function setActiveSet(index) {
+      const nextIndex = (index + animationSets.length) % animationSets.length;
+      if (nextIndex === currentSetIndex) return;
+
+      currentSetIndex = nextIndex;
+      setAnimIndex = -1;
+      resetAnimations();
+      updateSetButtons();
+    }
 
     function playByIndex(i) {
-      animIndex = (i + animNames.length) % animNames.length; // wrap
-      playAction(animNames[animIndex]);
+      const order = getActiveAnimationOrder();
+      const clampedIndex = Math.max(0, Math.min(i, order.length - 1));
+      setAnimIndex = clampedIndex;
+      playAction(getAnimationName(setAnimIndex));
+      updateProgressBar();
+    }
+
+    function playNext() {
+      const order = getActiveAnimationOrder();
+      const nextIndex = setAnimIndex < 0 ? 0 : Math.min(setAnimIndex + 1, order.length - 1);
+      playByIndex(nextIndex);
+    }
+
+    function playPrevious() {
+      const order = getActiveAnimationOrder();
+      const prevIndex = setAnimIndex < 0 ? order.length - 1 : (setAnimIndex === 0 ? order.length - 1 : setAnimIndex - 1);
+      playByIndex(prevIndex);
     }
     
-    // Initial (optional)
-    playByIndex(0);
+    // Initial set and animation
+    setActiveSet(0);
     
-    document.getElementById("prevBtn").addEventListener("click", () => {
-      playByIndex(animIndex - 1);
+    document.getElementById('setUnpackingBtn').addEventListener('click', () => {
+      setActiveSet(0);
     });
-    
-    document.getElementById("nextBtn").addEventListener("click", () => {
-      playByIndex(animIndex + 1);
+    document.getElementById('setInstallationBtn').addEventListener('click', () => {
+      setActiveSet(1);
+    });
+    document.getElementById('prevBtn').addEventListener('click', () => {
+      playPrevious();
+    });
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      playNext();
     });
 
 

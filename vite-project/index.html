@@ -28,8 +28,77 @@
         left: 50%;
         transform: translateX(-50%); 
         display: flex;
+        flex-direction: column;
+        align-items: center;
         gap: 10px;
         z-index: 100;
+        width: min(420px, calc(100vw - 40px));
+      }
+
+      #step-progress {
+        width: 100%;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      #step-progress-fill {
+        width: 0%;
+        height: 100%;
+        background: rgba(50, 115, 235, 0.95);
+        transition: width 0.2s ease;
+      }
+
+      #step-progress-label {
+        font-size: 13px;
+        color: #fff;
+        opacity: 0.9;
+      }
+
+      .button-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        justify-content: center;
+      }
+
+      #set-selector {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 150;
+      }
+
+      #set-selector button {
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        transition: background 0.2s, transform 0.2s;
+        min-width: 150px;
+        text-align: left;
+      }
+
+      #set-selector button.active {
+        background: rgba(50, 115, 235, 0.95);
+        color: #fff;
+        transform: scale(1.02);
+      }
+
+      #set-selector button:hover {
+        background: rgba(255, 255, 255, 1);
+      }
+
+      #set-selector .label {
+        color: #fff;
+        font-size: 13px;
+        opacity: 0.85;
       }
 
       #buttons button {
@@ -120,36 +189,24 @@
     <!-- <button onclick="playAction('DoorOpen')">Open Door</button>
     <button onclick="playAction('DoorClose')">Close Door</button> -->
     <div id="container"></div>
+    <div id="set-selector">
+      <button id="setUnpackingBtn" class="active">Unpacking</button>
+      <button id="setInstallationBtn">Installation</button>
+      <!-- <div id="activeSetLabel" class="label">Set: Unpacking</div> -->
+    </div>
     <!-- <div id="instructions-overlay"> -->
       <!-- <h2 id="instruction-heading">Welcome</h2> -->
       <!-- <p id="instruction-text">Click any step button below to see product instructions.</p> -->
     <!-- </div> -->
     <div id="buttons">
-      <!-- <button id="instructions">Instructions</button>
-      <button id="demo">Demo</button> -->
-      <!-- <button id="btn-1">Step 1</button>
-      <button id="btn-2">Step 2</button>
-      <button id="btn-3">Step 3</button>
-      <button id="btn-4">Step 4</button>
-      <button id="btn-5">Step 5</button>
-      <button id="btn-6">Step 6</button>
-      <button id="btn-7">Step 7</button>
-      <button id="btn-8">Step 8</button>
-      <button id="btn-9">Step 9</button>
-      <button id="btn-10">Step 10</button>
-      <button id="btn-11">Step 11</button>
-      <button id="btn-12">Positioning stove</button>
-      <button id="btn-12">Top outlet</button>
-      <button id="btn-12">Rear outlet 1</button>
-      <button id="btn-12">Rear outlet 2</button>
-      <button id="btn-12">Rear outlet 3</button> -->
-
-      <button id="prevBtn">Previous</button>
-      <button id="nextBtn">Next</button>
-      <!-- <button id="btn-left">Left</button>
-      <button id="btn-middle">Middle</button>
-      <button id="btn-right">Right</button> -->
-      <!-- <button id="btn-reset">Reset</button> -->
+      <div id="step-progress">
+        <div id="step-progress-fill"></div>
+      </div>
+      <div id="step-progress-label">0 of 0 steps</div>
+      <div class="button-row">
+        <button id="prevBtn">Previous</button>
+        <button id="nextBtn">Next</button>
+      </div>
     </div>
     <!-- <script type="module" src="src/stoveInstructions.js"></script> -->
     <script type="module" src="src/stoveInstructions.js"></script>
