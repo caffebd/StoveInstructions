@@ -96,6 +96,10 @@ const cameraValues = new CameraValues({
       rotation: new THREE.Euler(48.902575, -17.005944, 18.536102),
     },
     rear_outlet_config_3: {
+      position: new THREE.Vector3(-0.410012, 0.899713, 0.684473),
+      rotation: new THREE.Euler(-37.182597, -22.32989, -16.077372),
+    },
+    rear_outlet_config_4: {
       position: new THREE.Vector3(0.490446, 0.444156, -1.309415),
       rotation: new THREE.Euler(-167.288555, 15.79623, 176.486229),
     },
@@ -106,15 +110,4 @@ const cameraValues = new CameraValues({
   },
 });
 
-// Timed mid-animation camera moves.
-// Key format: 'setName/stepName'
-// timeMs: milliseconds after animation starts to trigger the move
-const midwayCameraMoves = {
-  'installation/rear_outlet_config_2': {
-    timeMs: 4400,
-    position: new THREE.Vector3(-0.410012, 0.899713, 0.684473),
-    rotation: new THREE.Euler(-37.182597, -22.32989, -16.077372),
-  },
-};
-
-export { CameraValues, cameraValues, midwayCameraMoves };
+export { CameraValues, cameraValues };

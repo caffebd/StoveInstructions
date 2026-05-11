@@ -19,7 +19,7 @@ import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js
 import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { cameraValues, midwayCameraMoves } from './cameraValues.js';
+import { cameraValues } from './cameraValues.js';
 
 
 let currentAction = null;
@@ -251,28 +251,6 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
 
     requestAnimationFrame(tick);
   });
-}
-
-// Schedule a mid-animation camera move if one is defined for this set/step.
-// Cancels automatically if navigation occurs (playToken changes).
-function scheduleMidwayCamera(setName, stepName, playToken, getPlayToken) {
-  const key = `${setName}/${stepName}`;
-  const move = midwayCameraMoves[key];
-  if (!move) return;
-
-  const timerId = setTimeout(() => {
-    if (getPlayToken() !== playToken) return;
-    // Build a one-off cameraValues entry and move to it
-    const tempValues = cameraValues.setStep('__midway__', key, {
-      position: move.position,
-      rotation: move.rotation,
-    });
-    moveCameraToStep('__midway__', key);
-  }, move.timeMs);
-
-  // Return a cancel handle (used if we need to cancel early — navigation
-  // already cancels via the token check, but explicit cancel is cleaner)
-  return () => clearTimeout(timerId);
 }
 
 function captureInitialViewState() {
@@ -569,18 +547,24 @@ const instructionCopyBySet = {
       bullets: [
         'Remove the M6 flanged bolt from the centre of the blanking plate and from the top of the appliance.',
         'Before installation, remove the locking nut from the top plate levelling disk. Install the levelling disk into the top opening and adjust it to be flush with the top plate.',
-        'Reattach the locking nut from inside the appliance and tighten it to securely hold the levelling disk in place.',
       ],
     },
     rear_outlet_config_3: {
       stepNumber: 9,
+      title: 'Levelling Disk',
+      bullets: [
+        'Reattach the locking nut from inside the appliance and tighten it to securely hold the levelling disk in place.',
+      ],
+    },
+    rear_outlet_config_4: {
+      stepNumber: 10,
       title: 'Heat Shield Disk',
       bullets: [
         'Remove the circular disk from the heat shield and then reinstall the heat shield.',
       ],
     },
     flue_cage_install: {
-      stepNumber: 10,
+      stepNumber: 11,
       title: 'Flue Cage Installation',
       bullets: [
         'Align the flue cage into position over the flue outlet. Secure it in place by bolting it up into the spacing bolt.',
@@ -1339,7 +1323,6 @@ loader.load(
       if (requestToken !== activePlayToken) return;
 
       playAction(stepName);
-      scheduleMidwayCamera(activeSetKey, stepName, requestToken, () => activePlayToken);
       updateProgressBar();
       updateInstructionPanel();
     }
