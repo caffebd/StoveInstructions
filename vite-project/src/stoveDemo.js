@@ -344,6 +344,7 @@ customMaterials.forEach(mat => {
   if (mixer) mixer.update(delta);
   if (controls) controls.update();
 
+  updateLeverHighlight(delta);
   composer.render();
 
   stats.end();
@@ -1661,9 +1662,19 @@ let stoveModel;
 let lerpSlider;
 
 const leverPickTargets = [];
+const leverOccluderTargets = [];
 const leverNodeNames = new Set();
 const leverPointerRaycaster = new THREE.Raycaster();
 const leverPointerNdc = new THREE.Vector2();
+
+let hoveredLeverMesh = null;
+let draggingLeverMesh = null;
+let lastHighlightedLeverMesh = null;
+let leverHighlightValue = 0;
+
+const LEVER_HOVER_STRENGTH = 0.18;
+const LEVER_ACTIVE_STRENGTH = 0.45;
+const LEVER_HIGHLIGHT_COLOR = 0x03fc1c;
 
 let leverDragActive = false;
 let leverDragPointerId = null;
@@ -1704,6 +1715,7 @@ function isLeverMesh(mesh) {
 
 function registerLeverDragTargets(stoveRoot, animations) {
   leverPickTargets.length = 0;
+  leverOccluderTargets.length = 0;
   leverNodeNames.clear();
 
   const stoveLeverClip = animations.find((clip) => clip.name === 'stove_lever');
@@ -1714,6 +1726,8 @@ function registerLeverDragTargets(stoveRoot, animations) {
     if (!child.isMesh) return;
     if (isLeverMesh(child)) {
       leverPickTargets.push(child);
+    } else {
+      leverOccluderTargets.push(child);
     }
   });
 
@@ -1775,13 +1789,92 @@ function setLeverPointerNdc(event) {
   leverPointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 }
 
+function getLeverTargetMesh(object) {
+  let current = object;
+  while (current) {
+    if (current.isMesh && current.name !== 'lever_drag_collider' && isLeverMesh(current)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return null;
+}
+
+function ensureLeverHighlightMaterial(mesh) {
+  if (!mesh || !mesh.material || mesh.userData.highlightMaterialPrepared) return;
+
+  const material = mesh.material;
+  mesh.userData.highlightBaseEmissive = material.emissive ? material.emissive.clone() : null;
+  mesh.userData.highlightBaseEmissiveIntensity = typeof material.emissiveIntensity === 'number' ? material.emissiveIntensity : 0;
+  mesh.userData.originalMaterial = material;
+  mesh.material = material.clone();
+  mesh.userData.highlightMaterialPrepared = true;
+}
+
+function restoreLeverHighlight(mesh) {
+  if (!mesh?.material) return;
+  if (mesh.userData.highlightBaseEmissive && mesh.material.emissive) {
+    mesh.material.emissive.copy(mesh.userData.highlightBaseEmissive);
+  }
+  if (typeof mesh.userData.highlightBaseEmissiveIntensity === 'number') {
+    mesh.material.emissiveIntensity = mesh.userData.highlightBaseEmissiveIntensity;
+  }
+  mesh.material.needsUpdate = true;
+}
+
+function updateLeverHighlight(delta) {
+  const targetMesh = draggingLeverMesh || hoveredLeverMesh;
+  const targetStrength = draggingLeverMesh ? LEVER_ACTIVE_STRENGTH : (hoveredLeverMesh ? LEVER_HOVER_STRENGTH : 0);
+  const blend = THREE.MathUtils.clamp(delta * 12, 0, 1);
+
+  leverHighlightValue = THREE.MathUtils.lerp(leverHighlightValue, targetStrength, blend);
+
+  if (targetMesh !== lastHighlightedLeverMesh) {
+    if (lastHighlightedLeverMesh) {
+      restoreLeverHighlight(lastHighlightedLeverMesh);
+    }
+    lastHighlightedLeverMesh = targetMesh;
+  }
+
+  if (targetMesh && targetMesh.material && 'emissive' in targetMesh.material) {
+    ensureLeverHighlightMaterial(targetMesh);
+    targetMesh.material.emissive.setHex(LEVER_HIGHLIGHT_COLOR);
+    targetMesh.material.emissiveIntensity = leverHighlightValue;
+    targetMesh.material.needsUpdate = true;
+  } else if (!targetMesh && lastHighlightedLeverMesh) {
+    restoreLeverHighlight(lastHighlightedLeverMesh);
+    lastHighlightedLeverMesh = null;
+  }
+}
+
 function isPointerOverLever(event) {
   if (!stoveModel || leverPickTargets.length === 0) return false;
 
   setLeverPointerNdc(event);
   leverPointerRaycaster.setFromCamera(leverPointerNdc, camera);
-  const hits = leverPointerRaycaster.intersectObjects(leverPickTargets, true);
-  return hits.length > 0;
+  const hits = leverPointerRaycaster.intersectObjects(
+    [...leverPickTargets, ...leverOccluderTargets],
+    true
+  );
+  const hit = hits[0];
+
+  if (!hit) {
+    hoveredLeverMesh = null;
+    if (!leverDragActive) renderer.domElement.style.cursor = '';
+    return false;
+  }
+
+  hoveredLeverMesh = getLeverTargetMesh(hit.object);
+  if (!hoveredLeverMesh) {
+    if (!leverDragActive) renderer.domElement.style.cursor = '';
+    return false;
+  }
+
+  if (!leverDragActive) {
+    renderer.domElement.style.cursor = 'grab';
+  }
+
+  return true;
 }
 
 function stopLeverDragging() {
@@ -1789,6 +1882,7 @@ function stopLeverDragging() {
   leverDragActive = false;
   leverDragPointerId = null;
   controls.enabled = true;
+  draggingLeverMesh = null;
   renderer.domElement.style.cursor = '';
 }
 
@@ -1800,6 +1894,7 @@ function setupLeverDragInteraction() {
     if (!isPointerOverLever(event)) return;
 
     leverDragActive = true;
+    draggingLeverMesh = hoveredLeverMesh;
     leverDragPointerId = event.pointerId;
     leverLastClientX = event.clientX;
     controls.enabled = false;
@@ -1810,7 +1905,7 @@ function setupLeverDragInteraction() {
 
   canvas.addEventListener('pointermove', (event) => {
     if (!leverDragActive) {
-      canvas.style.cursor = isPointerOverLever(event) ? 'grab' : '';
+      isPointerOverLever(event);
       return;
     }
 
@@ -1826,11 +1921,13 @@ function setupLeverDragInteraction() {
     if (event.pointerId !== leverDragPointerId) return;
     canvas.releasePointerCapture?.(event.pointerId);
     stopLeverDragging();
+    isPointerOverLever(event);
   });
 
   canvas.addEventListener('pointercancel', stopLeverDragging);
   canvas.addEventListener('pointerleave', () => {
     if (!leverDragActive) {
+      hoveredLeverMesh = null;
       canvas.style.cursor = '';
     }
   });
