@@ -44,6 +44,14 @@ function isMobileViewport() {
   return window.innerWidth <= 768;
 }
 
+function getQualityTier() {
+  const cores = navigator.hardwareConcurrency ?? 4;
+  if (!isMobileViewport()) return 'high';
+  if (cores >= 8) return 'high';   // high-end mobile (M-series, Snapdragon 8+)
+  if (cores >= 5) return 'medium'; // mid-range mobile
+  return 'low';                     // low-end mobile
+}
+
 function getControlsEnabledBaseline() {
   return initialViewState?.controlsEnabled ?? true;
 }
@@ -1044,8 +1052,11 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
 camera.position.set(0.5, 0.1, 1.5);
 
+const qualityTier = getQualityTier();
+const dprCap = qualityTier === 'low' ? 1 : qualityTier === 'medium' ? 1.5 : 2;
+
 const renderer = new THREE.WebGLRenderer();
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1071,7 +1082,7 @@ ssaoPass.kernelRadius = 0.5;
 ssaoPass.minDistance = 0.001;
 ssaoPass.maxDistance = 0.1;
 
-composer.addPass(ssaoPass);
+if (qualityTier === 'high') composer.addPass(ssaoPass);
 
 // const bloom = new UnrealBloomPass(
 //   new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -1083,7 +1094,7 @@ composer.addPass(ssaoPass);
 // composer.addPass(bloom);
 
 const smaaPass = new SMAAPass(window.innerWidth, window.innerHeight);
-composer.addPass(smaaPass);
+if (qualityTier !== 'low') composer.addPass(smaaPass);
 
 const outputPass = new OutputPass();
 composer.addPass( outputPass );
@@ -1462,6 +1473,7 @@ loader.load(
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
 });
