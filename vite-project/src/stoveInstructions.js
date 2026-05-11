@@ -30,12 +30,12 @@ const MOBILE_CAMERA_DISTANCE_MULTIPLIER = 1.14;
 const MOBILE_CAMERA_STEP_OVERRIDES = {
   installation: {
     step_3: {
-      distanceMultiplier: 1.22,
+      distanceMultiplier: 1.4,
       targetOffset: [-0.16, 0.0, 0.0],
     },
     rear_outlet_config_4: {
-      distanceMultiplier: 1.14,
-      targetOffset: [-0.13, 0.0, 0.0],
+      distanceMultiplier: 1.18,
+      targetOffset: [0.25, 0.0, 0.0],
     },
   },
 };
