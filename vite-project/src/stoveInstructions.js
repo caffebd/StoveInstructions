@@ -26,6 +26,11 @@ let currentAction = null;
 let playedActions = new Set();
 let activeCameraMoveToken = 0;
 let initialViewState = null;
+const MOBILE_CAMERA_DISTANCE_MULTIPLIER = 1.14;
+
+function isMobileViewport() {
+  return window.innerWidth <= 768;
+}
 
 function normalizeRotationComponent(value) {
   return THREE.MathUtils.degToRad(value);
@@ -208,6 +213,11 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(endQuaternion);
   const targetDistance = hasControls ? Math.max(camera.position.distanceTo(controls.target), 1) : 1;
   const endTarget = endPosition.clone().addScaledVector(forward, targetDistance);
+  const mobileAdjustedEndPosition = isMobileViewport()
+    ? endTarget.clone().add(
+        endPosition.clone().sub(endTarget).multiplyScalar(MOBILE_CAMERA_DISTANCE_MULTIPLIER)
+      )
+    : endPosition;
   const startQuaternion = hasControls ? null : camera.quaternion.clone();
 
   const wasControlsEnabled = hasControls ? controls.enabled : false;
@@ -226,7 +236,7 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
       const t = Math.min((now - startTime) / durationMs, 1);
       const eased = easeOutCubic(t);
 
-      camera.position.lerpVectors(startPosition, endPosition, eased);
+      camera.position.lerpVectors(startPosition, mobileAdjustedEndPosition, eased);
 
       if (hasControls) {
         controls.target.lerpVectors(startTarget, endTarget, eased);
