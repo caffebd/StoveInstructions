@@ -94,6 +94,7 @@ function createAirControlPanelController() {
     panel.style.left = `${rect.left}px`;
     panel.style.top = `${rect.top}px`;
     panel.style.right = 'auto';
+    panel.style.transform = 'none';
     if (computed.bottom !== 'auto') {
       panel.style.bottom = 'auto';
     }
@@ -160,7 +161,7 @@ function createAirControlPanelController() {
   header.addEventListener('pointerup', stopDrag);
   header.addEventListener('pointercancel', stopDrag);
 
-  setCollapsed(false);
+  setCollapsed(window.innerWidth <= 768);
   render();
 }
 
@@ -2204,10 +2205,20 @@ document.getElementById('airControlsBtn')?.addEventListener('click', () => {
   window.location.assign('/stoveDemo.html');
 });
 
+const menuToggle = document.getElementById('menu-toggle');
+const setSelector = document.getElementById('set-selector');
+if (menuToggle && setSelector) {
+  menuToggle.addEventListener('click', () => {
+    const isOpen = setSelector.classList.toggle('open');
+    menuToggle.setAttribute('aria-expanded', String(isOpen));
+  });
+}
+
 const container = document.getElementById('container');
 
 const stats = new Stats();
 container.appendChild(stats.dom);
+stats.dom.style.display = 'none';
 
 // Slider for targetLerp (0-1)
 lerpSlider = document.createElement('input');
@@ -2227,6 +2238,7 @@ Object.assign(lerpSlider.style, {
   webkitUserSelect: 'none',
   webkitTouchCallout: 'none',
   touchAction: 'none',
+  accentColor: '#e5531a',
 });
 lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)));
 container.appendChild(lerpSlider);
