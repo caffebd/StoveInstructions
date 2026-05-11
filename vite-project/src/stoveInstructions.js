@@ -190,6 +190,7 @@ function createCameraCapturePanel({ getSetKey, getStepName }) {
   panel.appendChild(button);
   panel.appendChild(hint);
   document.body.appendChild(panel);
+  panel.style.display = 'none';
 }
 
 function moveCameraToStep(setName, stepName, durationMs = 320) {
@@ -678,10 +679,14 @@ function createInstructionPanelController() {
     setCollapsed(!isCollapsed);
   });
 
-  header.addEventListener('pointerdown', startDrag);
-  header.addEventListener('pointermove', onDrag);
-  header.addEventListener('pointerup', stopDrag);
-  header.addEventListener('pointercancel', stopDrag);
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+
+  if (!isTouch) {
+    header.addEventListener('pointerdown', startDrag);
+    header.addEventListener('pointermove', onDrag);
+    header.addEventListener('pointerup', stopDrag);
+    header.addEventListener('pointercancel', stopDrag);
+  }
 
   function update({ stepText, titleText, bulletItems }) {
     stepLabel.textContent = stepText;
@@ -695,7 +700,7 @@ function createInstructionPanelController() {
     });
   }
 
-  setCollapsed(false);
+  setCollapsed(window.innerWidth <= 768);
 
   return {
     update,
@@ -959,6 +964,7 @@ stats.dom.style.position = 'absolute';
 stats.dom.style.top = '10px';
 stats.dom.style.right = '10px';
 stats.dom.style.left = 'auto';
+stats.dom.style.display = 'none';
 
 const scene = new THREE.Scene();
 
@@ -1325,11 +1331,24 @@ loader.load(
       getStepName: () => (setAnimIndex < 0 ? null : getAnimationName(setAnimIndex)),
     });
     
+    const menuToggle = document.getElementById('menu-toggle');
+    const setSelector = document.getElementById('set-selector');
+    if (menuToggle && setSelector) {
+      menuToggle.addEventListener('click', () => {
+        const isOpen = setSelector.classList.toggle('open');
+        menuToggle.setAttribute('aria-expanded', String(isOpen));
+      });
+    }
+
     document.getElementById('setUnpackingBtn').addEventListener('click', () => {
       setActiveSet(0);
+      setSelector?.classList.remove('open');
+      menuToggle?.setAttribute('aria-expanded', 'false');
     });
     document.getElementById('setInstallationBtn').addEventListener('click', () => {
       setActiveSet(1);
+      setSelector?.classList.remove('open');
+      menuToggle?.setAttribute('aria-expanded', 'false');
     });
     document.getElementById('airControlsBtn')?.addEventListener('click', () => {
       renderer.setAnimationLoop(null);
