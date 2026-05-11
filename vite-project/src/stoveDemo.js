@@ -1672,9 +1672,9 @@ let draggingLeverMesh = null;
 let lastHighlightedLeverMesh = null;
 let leverHighlightValue = 0;
 
-const LEVER_HOVER_STRENGTH = 0.18;
-const LEVER_ACTIVE_STRENGTH = 0.45;
-const LEVER_HIGHLIGHT_COLOR = 0x03fc1c;
+const LEVER_HOVER_STRENGTH = 0.05;
+const LEVER_ACTIVE_STRENGTH = 0.15;
+const LEVER_HIGHLIGHT_COLOR = 0xffffff;
 
 let leverDragActive = false;
 let leverDragPointerId = null;
