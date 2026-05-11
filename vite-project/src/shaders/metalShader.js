@@ -2,7 +2,8 @@ const preamble = /* glsl */`
 
   uniform float TIME;
 
-  uniform sampler2D stoveMasksAO;
+  uniform sampler2D stoveMasks;
+  uniform sampler2D stoveAO;
   uniform int maskSelect;
   uniform vec3 stoveColorA;
   uniform vec3 stoveColorB;
@@ -47,9 +48,9 @@ const fragmentShaderSource = /* glsl */ `
 ${preamble}
 
 void main() {
-  vec2 uv = rotateUV(UV * 15.0, 90.0, vec2(0.5, 0.5));
-	vec4 masks = texture(stoveMasksAO, uv);
-	float ao = texture(stoveMasksAO, UV).a;
+  vec2 uv = rotateUV(UV * 15.0, 0.0, vec2(0.5, 0.5));
+	vec4 masks = texture(stoveMasks, uv);
+	float ao = texture(stoveAO, UV).a - 0.03;
 	float mask;
 	if (maskSelect == 0){
 		mask = masks.r;
@@ -66,7 +67,7 @@ void main() {
   csm_DiffuseColor = vec4(albedo, 1.0);
   csm_Roughness = rough;
   csm_Metalness = 1.0;
-  // csm_AO = 1.0 - ao;
+  csm_AO = 1.0 - ao;
   
 }
 `;
