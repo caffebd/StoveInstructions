@@ -193,7 +193,7 @@ function createCameraCapturePanel({ getSetKey, getStepName }) {
   panel.style.display = 'none';
 }
 
-function moveCameraToStep(setName, stepName, durationMs = 320) {
+function moveCameraToStep(setName, stepName, durationMs = 668) {
   const stepCamera = cameraValues.getStep(setName, stepName);
   if (!stepCamera) return Promise.resolve(false);
 
