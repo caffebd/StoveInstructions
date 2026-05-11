@@ -63,47 +63,58 @@ const cameraValues = new CameraValues({
     },
   },
   installation: {
-    step_1: {
-      position: new THREE.Vector3(1.47905, -1.40783, 0.036086),
-      rotation: new THREE.Euler(88.7135, 0, 51.9645),
-    },
-    step_2: {
-      position: new THREE.Vector3(0.001052, -0.972269, -0.487812),
-      rotation: new THREE.Euler(121.524, 0, 0),
-    },
     step_3: {
-      position: new THREE.Vector3(1.09436, 1.42217, 0.113837),
-      rotation: new THREE.Euler(86.1618, 0, 142.542),
-    },
-    step_4: {
-      position: new THREE.Vector3(1.09436, 1.42217, 0.113837),
-      rotation: new THREE.Euler(86.1618, 0, 142.542),
-    },
-    step_5: {
-      position: new THREE.Vector3(0.615079, 1.02734, -1.0731),
-      rotation: new THREE.Euler(117.878, 0, 149.468),
+      position: new THREE.Vector3(1.035256, 0.235604, 1.175898),
+      rotation: new THREE.Euler(-11.329805, 40.802068, 7.459041),
     },
     step_6: {
-      position: new THREE.Vector3(0.001052, -0.972269, -0.487812),
-      rotation: new THREE.Euler(121.524, 0, 0),
-    },
-    step_7: {
-      position: new THREE.Vector3(1.09436, 1.42217, 0.113837),
-      rotation: new THREE.Euler(86.1618, 0, 142.542),
-    },
-    step_8: {
-      position: new THREE.Vector3(0.001052, -0.972269, -0.487812),
-      rotation: new THREE.Euler(121.524, 0, 0),
-    },
-    step_9: {
-      position: new THREE.Vector3(1.09436, 1.42217, 0.113837),
-      rotation: new THREE.Euler(86.1618, 0, 142.542),
+      position: new THREE.Vector3(0.045265, -0.601434, 1.298974),
+      rotation: new THREE.Euler(26.284813, 1.697044, -0.837989),
     },
     step_10: {
-      position: new THREE.Vector3(0.001052, -0.972269, -0.487812),
-      rotation: new THREE.Euler(121.524, 0, 0),
+      position: new THREE.Vector3(0.765069, 0.481056, -1.302663),
+      rotation: new THREE.Euler(-161.225466, 28.762061, 170.71061),
+    },
+    step_11: {
+      position: new THREE.Vector3(0.667788, 0.51511, -1.168457),
+      rotation: new THREE.Euler(-161.225466, 28.762061, 170.71061),
+    },
+    positioning_stove: {
+      position: new THREE.Vector3(-0.657003, -0.980395, 0.805632),
+      rotation: new THREE.Euler(35.486909, -32.608355, 21.016943),
+    },
+    top_outlet_config: {
+      position: new THREE.Vector3(-0.254048, -0.389538, 0.563338),
+      rotation: new THREE.Euler(40.569174, -18.870391, 15.477943),
+    },
+    rear_outlet_config_1: {
+      position: new THREE.Vector3(0.517878, 0.318898, -0.919049),
+      rotation: new THREE.Euler(-172.64268, 29.174947, 176.398377),
+    },
+    rear_outlet_config_2: {
+      position: new THREE.Vector3(-0.157332, -0.322599, 0.385214),
+      rotation: new THREE.Euler(48.902575, -17.005944, 18.536102),
+    },
+    rear_outlet_config_3: {
+      position: new THREE.Vector3(0.490446, 0.444156, -1.309415),
+      rotation: new THREE.Euler(-167.288555, 15.79623, 176.486229),
+    },
+    flue_cage_install: {
+      position: new THREE.Vector3(0.158223, -0.35313, 0.495232),
+      rotation: new THREE.Euler(43.716626, 9.844696, -9.284875),
     },
   },
 });
 
-export { CameraValues, cameraValues };
+// Timed mid-animation camera moves.
+// Key format: 'setName/stepName'
+// timeMs: milliseconds after animation starts to trigger the move
+const midwayCameraMoves = {
+  'installation/rear_outlet_config_2': {
+    timeMs: 4400,
+    position: new THREE.Vector3(-0.410012, 0.899713, 0.684473),
+    rotation: new THREE.Euler(-37.182597, -22.32989, -16.077372),
+  },
+};
+
+export { CameraValues, cameraValues, midwayCameraMoves };

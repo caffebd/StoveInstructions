@@ -77,8 +77,13 @@
         transform: scale(1.02);
       }
 
-      #set-selector button:hover {
+      #set-selector button:not(.active):hover {
         background: rgba(255, 255, 255, 1);
+      }
+
+      #set-selector button.active:hover {
+        background: rgba(50, 115, 235, 0.95);
+        color: #fff;
       }
 
       #instruction-panel {

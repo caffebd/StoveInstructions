@@ -19,12 +19,13 @@ import { glassVertexShader, glassFragmentShader } from './shaders/glassShader.js
 import { ropeVertexShader, ropeFragmentShader } from './shaders/ropeShader.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { cameraValues } from './cameraValues.js';
+import { cameraValues, midwayCameraMoves } from './cameraValues.js';
 
 
 let currentAction = null;
 let playedActions = new Set();
 let activeCameraMoveToken = 0;
+let initialViewState = null;
 
 function normalizeRotationComponent(value) {
   return THREE.MathUtils.degToRad(value);
@@ -41,6 +42,154 @@ function normalizeRotation(rotation) {
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function round6(value) {
+  return Number(value.toFixed(6));
+}
+
+function formatVector3(vec) {
+  return `${round6(vec.x)}, ${round6(vec.y)}, ${round6(vec.z)}`;
+}
+
+function eulerToDegrees(euler) {
+  return new THREE.Euler(
+    round6(THREE.MathUtils.radToDeg(euler.x)),
+    round6(THREE.MathUtils.radToDeg(euler.y)),
+    round6(THREE.MathUtils.radToDeg(euler.z)),
+    euler.order
+  );
+}
+
+function formatStepSnippet(stepName, position, rotationDeg) {
+  return `${stepName}: {\n  position: new THREE.Vector3(${formatVector3(position)}),\n  rotation: new THREE.Euler(${round6(rotationDeg.x)}, ${round6(rotationDeg.y)}, ${round6(rotationDeg.z)}),\n},`;
+}
+
+function getModelFocusPoint() {
+  if (!model) return new THREE.Vector3(0, 0, 0);
+  const bounds = new THREE.Box3().setFromObject(model);
+  if (bounds.isEmpty()) return model.position.clone();
+  return bounds.getCenter(new THREE.Vector3());
+}
+
+function captureCameraSnapshot(setKey, stepName) {
+
+  const position = camera.position.clone();
+  const rotationRad = camera.rotation.clone();
+  const rotationDeg = eulerToDegrees(rotationRad);
+  const quaternion = camera.quaternion.clone();
+  const target = controls ? controls.target.clone() : getModelFocusPoint();
+  const distanceToTarget = position.distanceTo(target);
+
+  const snapshot = {
+    set: setKey,
+    step: stepName,
+    position: {
+      x: round6(position.x),
+      y: round6(position.y),
+      z: round6(position.z),
+    },
+    rotationRadians: {
+      x: round6(rotationRad.x),
+      y: round6(rotationRad.y),
+      z: round6(rotationRad.z),
+      order: rotationRad.order,
+    },
+    rotationDegrees: {
+      x: round6(rotationDeg.x),
+      y: round6(rotationDeg.y),
+      z: round6(rotationDeg.z),
+      order: rotationDeg.order,
+    },
+    quaternion: {
+      x: round6(quaternion.x),
+      y: round6(quaternion.y),
+      z: round6(quaternion.z),
+      w: round6(quaternion.w),
+    },
+    target: {
+      x: round6(target.x),
+      y: round6(target.y),
+      z: round6(target.z),
+    },
+    distanceToTarget: round6(distanceToTarget),
+    zoom: round6(camera.zoom),
+    fov: round6(camera.fov),
+    near: round6(camera.near),
+    far: round6(camera.far),
+  };
+
+  const stepSnippet = formatStepSnippet(stepName, position, rotationDeg);
+  const setStepCommand = `cameraValues.setStep('${setKey}', '${stepName}', { position: [${formatVector3(position)}], rotation: [${round6(rotationDeg.x)}, ${round6(rotationDeg.y)}, ${round6(rotationDeg.z)}] });`;
+
+  console.group(`[Camera Snapshot] ${setKey} / ${stepName}`);
+  console.log('Snapshot object:', snapshot);
+  console.log('Step snippet:');
+  console.log(stepSnippet);
+  console.log('Set command:');
+  console.log(setStepCommand);
+  console.groupEnd();
+
+  return { snapshot, stepSnippet, setStepCommand };
+}
+
+function createCameraCapturePanel({ getSetKey, getStepName }) {
+  const panel = document.createElement('div');
+  panel.style.cssText = [
+    'position: fixed',
+    'bottom: 20px',
+    'left: 20px',
+    'z-index: 9999',
+    'display: flex',
+    'flex-direction: column',
+    'gap: 6px',
+    'padding: 8px',
+    'border-radius: 8px',
+    'background: rgba(16,16,16,0.78)',
+    'backdrop-filter: blur(4px)',
+    'font-family: sans-serif',
+  ].join(';');
+
+  const label = document.createElement('div');
+  label.textContent = 'Camera Capture';
+  label.style.cssText = 'color:#fff;font-size:12px;';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'step name (optional)';
+  input.style.cssText = 'font-size:12px;padding:6px;border-radius:6px;border:none;min-width:170px;';
+
+  const button = document.createElement('button');
+  button.textContent = 'Capture (K)';
+  button.style.cssText = 'font-size:12px;padding:6px 10px;border:none;border-radius:6px;background:#3b78e7;color:#fff;cursor:pointer;';
+
+  const hint = document.createElement('div');
+  hint.textContent = 'Logs step snippet to console';
+  hint.style.cssText = 'color:#cfcfcf;font-size:11px;';
+
+  const runCapture = () => {
+    const raw = input.value.trim();
+    const stepName = raw || getStepName() || 'step_custom';
+    const setKey = getSetKey();
+    captureCameraSnapshot(setKey, stepName);
+  };
+
+  button.addEventListener('click', runCapture);
+
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea') return;
+    if (e.repeat) return;
+    if (e.code === 'KeyK') {
+      runCapture();
+    }
+  });
+
+  panel.appendChild(label);
+  panel.appendChild(input);
+  panel.appendChild(button);
+  panel.appendChild(hint);
+  document.body.appendChild(panel);
 }
 
 function moveCameraToStep(setName, stepName, durationMs = 320) {
@@ -101,6 +250,53 @@ function moveCameraToStep(setName, stepName, durationMs = 320) {
 
     requestAnimationFrame(tick);
   });
+}
+
+// Schedule a mid-animation camera move if one is defined for this set/step.
+// Cancels automatically if navigation occurs (playToken changes).
+function scheduleMidwayCamera(setName, stepName, playToken, getPlayToken) {
+  const key = `${setName}/${stepName}`;
+  const move = midwayCameraMoves[key];
+  if (!move) return;
+
+  const timerId = setTimeout(() => {
+    if (getPlayToken() !== playToken) return;
+    // Build a one-off cameraValues entry and move to it
+    const tempValues = cameraValues.setStep('__midway__', key, {
+      position: move.position,
+      rotation: move.rotation,
+    });
+    moveCameraToStep('__midway__', key);
+  }, move.timeMs);
+
+  // Return a cancel handle (used if we need to cancel early — navigation
+  // already cancels via the token check, but explicit cancel is cleaner)
+  return () => clearTimeout(timerId);
+}
+
+function captureInitialViewState() {
+  initialViewState = {
+    position: camera.position.clone(),
+    quaternion: camera.quaternion.clone(),
+    target: controls ? controls.target.clone() : null,
+    controlsEnabled: controls ? controls.enabled : false,
+  };
+}
+
+function restoreInitialViewState() {
+  activeCameraMoveToken++;
+
+  if (!initialViewState) return;
+
+  camera.position.copy(initialViewState.position);
+
+  if (controls && initialViewState.target) {
+    controls.target.copy(initialViewState.target);
+    controls.enabled = initialViewState.controlsEnabled;
+    controls.update();
+  } else {
+    camera.quaternion.copy(initialViewState.quaternion);
+  }
 }
 
 
@@ -311,10 +507,94 @@ const instructionCopyBySet = {
       ],
     },
   },
+  installation: {
+    step_3: {
+      stepNumber: 1,
+      title: 'Door',
+      bullets: [
+        'Open the door fully, then lift it up and off its hinges to remove it from the stove.',
+        'Take care not to break the glass. Place the door on a cushioned surface, away from any heavy objects that could impact the glass.',
+      ],
+    },
+    step_6: {
+      stepNumber: 2,
+      title: 'Baffle Brick',
+      bullets: [
+        'To remove the baffle brick, lift it up at the front to expose the two supporting pins.',
+        'Remove these pins, then carefully slide the baffle brick toward you. Place it aside for later reassembly.',
+      ],
+    },
+    step_10: {
+      stepNumber: 3,
+      title: 'Heat Shield',
+      bullets: [
+        'Carefully remove the heat shield (if applicable) by unscrewing its fasteners and setting it aside for re-installation.',
+      ],
+    },
+    step_11: {
+      stepNumber: 4,
+      title: 'Blanking Plate',
+      bullets: [
+        'Carefully remove the blanking plate (if applicable) by unscrewing its fasteners and setting it aside for re-installation.',
+      ],
+    },
+    positioning_stove: {
+      stepNumber: 5,
+      title: 'Positioning and Levelling the Stove',
+      bullets: [
+        'Level the stove on the hearth by adjusting the hex screws on the base.',
+      ],
+    },
+    top_outlet_config: {
+      stepNumber: 6,
+      title: 'Top Outlet Configuration',
+      bullets: [
+        'The flue collar and blanking plate positions can be adjusted based on installation requirements. Each part features a ceramic gasket to ensure a proper seal.',
+        'Position the flue collar over the top outlet. Install the M6 flanged bolts through the keyhole slots in the collar.',
+        'Align the ceramic gasket between the flue collar and the appliance. Twist the collar slightly to lock it into position. Fully tighten the bolts to secure the flue collar in place.',
+      ],
+    },
+    rear_outlet_config_1: {
+      stepNumber: 7,
+      title: 'Rear Outlet Configuration',
+      bullets: [
+        'Position the flue collar over the rear outlet, ensuring the ceramic gasket is placed between the collar and the appliance.',
+        'Bolt the flue collar securely in place. Make sure to tighten the bolts on the flue collar to ensure a proper seal.',
+      ],
+    },
+    rear_outlet_config_2: {
+      stepNumber: 8,
+      title: 'Levelling Disk',
+      bullets: [
+        'Remove the M6 flanged bolt from the centre of the blanking plate and from the top of the appliance.',
+        'Before installation, remove the locking nut from the top plate levelling disk. Install the levelling disk into the top opening and adjust it to be flush with the top plate.',
+        'Reattach the locking nut from inside the appliance and tighten it to securely hold the levelling disk in place.',
+      ],
+    },
+    rear_outlet_config_3: {
+      stepNumber: 9,
+      title: 'Heat Shield Disk',
+      bullets: [
+        'Remove the circular disk from the heat shield and then reinstall the heat shield.',
+      ],
+    },
+    flue_cage_install: {
+      stepNumber: 10,
+      title: 'Flue Cage Installation',
+      bullets: [
+        'Align the flue cage into position over the flue outlet. Secure it in place by bolting it up into the spacing bolt.',
+        'Ensure all bolts are fully tightened to keep the flue cage securely in position.',
+      ],
+    },
+  },
 };
 
-const unpackingBookletMaxStep = Object.values(instructionCopyBySet.unpacking)
-  .reduce((max, item) => Math.max(max, item.stepNumber), 0);
+const bookletMaxStepBySet = Object.fromEntries(
+  Object.entries(instructionCopyBySet).map(([key, steps]) => [
+    key,
+    Object.values(steps).reduce((max, item) => Math.max(max, item.stepNumber ?? 0), 0),
+  ])
+);
 
 function prettifyStepName(stepName) {
   if (!stepName) return 'Instruction';
@@ -914,7 +1194,7 @@ loader.load(
 
       if (unpackingInstruction) {
         const current = unpackingInstruction.stepNumber;
-        const total = unpackingBookletMaxStep;
+        const total = bookletMaxStepBySet[activeSet.key] ?? steps;
         return {
           current,
           steps: total,
@@ -989,13 +1269,25 @@ loader.load(
       currentSetIndex = nextIndex;
       setAnimIndex = -1;
       resetAnimations();
+      restoreInitialViewState();
       updateSetButtons();
       updateInstructionPanel();
     }
 
     async function playByIndex(i) {
       const order = getActiveAnimationOrder();
-      const clampedIndex = Math.max(0, Math.min(i, order.length - 1));
+      const clampedIndex = Math.max(-1, Math.min(i, order.length - 1));
+
+      if (clampedIndex < 0) {
+        setAnimIndex = -1;
+        activePlayToken++;
+        resetAnimations();
+        restoreInitialViewState();
+        updateProgressBar();
+        updateInstructionPanel();
+        return;
+      }
+
       setAnimIndex = clampedIndex;
       const stepName = getAnimationName(setAnimIndex);
       const requestToken = ++activePlayToken;
@@ -1003,12 +1295,11 @@ loader.load(
 
       applySetStateAtIndex(order, clampedIndex);
 
-      if (activeSetKey !== 'installation') {
-        await moveCameraToStep(activeSetKey, stepName);
-      }
+      await moveCameraToStep(activeSetKey, stepName);
       if (requestToken !== activePlayToken) return;
 
       playAction(stepName);
+      scheduleMidwayCamera(activeSetKey, stepName, requestToken, () => activePlayToken);
       updateProgressBar();
       updateInstructionPanel();
     }
@@ -1020,8 +1311,7 @@ loader.load(
     }
 
     function playPrevious() {
-      const order = getActiveAnimationOrder();
-      const prevIndex = setAnimIndex < 0 ? order.length - 1 : (setAnimIndex === 0 ? order.length - 1 : setAnimIndex - 1);
+      const prevIndex = setAnimIndex <= 0 ? -1 : setAnimIndex - 1;
       playByIndex(prevIndex);
     }
     
@@ -1029,6 +1319,11 @@ loader.load(
     const initialSetParam = new URLSearchParams(window.location.search).get('set');
     const initialSetIndex = initialSetParam === 'installation' ? 1 : 0;
     setActiveSet(initialSetIndex);
+    captureInitialViewState();
+    createCameraCapturePanel({
+      getSetKey: () => getActiveSet().key,
+      getStepName: () => (setAnimIndex < 0 ? null : getAnimationName(setAnimIndex)),
+    });
     
     document.getElementById('setUnpackingBtn').addEventListener('click', () => {
       setActiveSet(0);
