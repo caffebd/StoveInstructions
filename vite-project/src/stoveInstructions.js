@@ -27,9 +27,56 @@ let playedActions = new Set();
 let activeCameraMoveToken = 0;
 let initialViewState = null;
 const MOBILE_CAMERA_DISTANCE_MULTIPLIER = 1.14;
+const MOBILE_CAMERA_STEP_OVERRIDES = {
+  installation: {
+    step_3: {
+      distanceMultiplier: 1.22,
+      targetOffset: [-0.16, 0.0, 0.0],
+    },
+    rear_outlet_config_4: {
+      distanceMultiplier: 1.14,
+      targetOffset: [-0.13, 0.0, 0.0],
+    },
+  },
+};
 
 function isMobileViewport() {
   return window.innerWidth <= 768;
+}
+
+function getControlsEnabledBaseline() {
+  return initialViewState?.controlsEnabled ?? true;
+}
+
+function getMobileCameraAdjustment(setName, stepName, endQuaternion) {
+  if (!isMobileViewport()) {
+    return {
+      distanceMultiplier: 1,
+      targetOffset: new THREE.Vector3(0, 0, 0),
+      positionOffset: new THREE.Vector3(0, 0, 0),
+    };
+  }
+
+  const stepOverride = MOBILE_CAMERA_STEP_OVERRIDES[setName]?.[stepName] ?? {};
+  const distanceMultiplier = stepOverride.distanceMultiplier ?? MOBILE_CAMERA_DISTANCE_MULTIPLIER;
+  const localTargetOffset = stepOverride.targetOffset ?? [0, 0, 0];
+  const localPositionOffset = stepOverride.positionOffset ?? [0, 0, 0];
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(endQuaternion);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(endQuaternion);
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(endQuaternion);
+
+  const targetOffset = right.clone().multiplyScalar(localTargetOffset[0])
+    .add(up.clone().multiplyScalar(localTargetOffset[1]))
+    .add(forward.clone().multiplyScalar(localTargetOffset[2]));
+  const positionOffset = right.clone().multiplyScalar(localPositionOffset[0])
+    .add(up.clone().multiplyScalar(localPositionOffset[1]))
+    .add(forward.clone().multiplyScalar(localPositionOffset[2]));
+
+  return {
+    distanceMultiplier,
+    targetOffset,
+    positionOffset,
+  };
 }
 
 function normalizeRotationComponent(value) {
@@ -212,15 +259,16 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
   const startTarget = hasControls ? controls.target.clone() : null;
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(endQuaternion);
   const targetDistance = hasControls ? Math.max(camera.position.distanceTo(controls.target), 1) : 1;
-  const endTarget = endPosition.clone().addScaledVector(forward, targetDistance);
-  const mobileAdjustedEndPosition = isMobileViewport()
-    ? endTarget.clone().add(
-        endPosition.clone().sub(endTarget).multiplyScalar(MOBILE_CAMERA_DISTANCE_MULTIPLIER)
-      )
-    : endPosition;
+  const baseEndTarget = endPosition.clone().addScaledVector(forward, targetDistance);
+  const mobileAdjustment = getMobileCameraAdjustment(setName, stepName, endQuaternion);
+  const endTarget = baseEndTarget.clone().add(mobileAdjustment.targetOffset);
+  const endCameraVector = endPosition.clone().sub(baseEndTarget)
+    .multiplyScalar(mobileAdjustment.distanceMultiplier);
+  const adjustedEndPosition = endTarget.clone()
+    .add(endCameraVector)
+    .add(mobileAdjustment.positionOffset);
   const startQuaternion = hasControls ? null : camera.quaternion.clone();
 
-  const wasControlsEnabled = hasControls ? controls.enabled : false;
   if (hasControls) controls.enabled = false;
 
   return new Promise((resolve) => {
@@ -228,7 +276,7 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
 
     const tick = (now) => {
       if (token !== activeCameraMoveToken) {
-        if (hasControls) controls.enabled = wasControlsEnabled;
+        if (hasControls) controls.enabled = getControlsEnabledBaseline();
         resolve(false);
         return;
       }
@@ -236,7 +284,7 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
       const t = Math.min((now - startTime) / durationMs, 1);
       const eased = easeOutCubic(t);
 
-      camera.position.lerpVectors(startPosition, mobileAdjustedEndPosition, eased);
+      camera.position.lerpVectors(startPosition, adjustedEndPosition, eased);
 
       if (hasControls) {
         controls.target.lerpVectors(startTarget, endTarget, eased);
@@ -252,7 +300,7 @@ function moveCameraToStep(setName, stepName, durationMs = 668) {
 
       if (hasControls) {
         controls.target.copy(endTarget);
-        controls.enabled = wasControlsEnabled;
+        controls.enabled = getControlsEnabledBaseline();
         controls.update();
       }
 
