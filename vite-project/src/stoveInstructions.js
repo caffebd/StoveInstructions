@@ -648,6 +648,7 @@ function createInstructionPanelController() {
     panel.style.left = `${rect.left}px`;
     panel.style.top = `${rect.top}px`;
     panel.style.right = 'auto';
+    panel.style.transform = 'none';
     if (computed.bottom !== 'auto') {
       panel.style.bottom = 'auto';
     }
@@ -679,14 +680,10 @@ function createInstructionPanelController() {
     setCollapsed(!isCollapsed);
   });
 
-  const isTouch = window.matchMedia('(pointer: coarse)').matches;
-
-  if (!isTouch) {
-    header.addEventListener('pointerdown', startDrag);
-    header.addEventListener('pointermove', onDrag);
-    header.addEventListener('pointerup', stopDrag);
-    header.addEventListener('pointercancel', stopDrag);
-  }
+  header.addEventListener('pointerdown', startDrag);
+  header.addEventListener('pointermove', onDrag);
+  header.addEventListener('pointerup', stopDrag);
+  header.addEventListener('pointercancel', stopDrag);
 
   function update({ stepText, titleText, bulletItems }) {
     stepLabel.textContent = stepText;
