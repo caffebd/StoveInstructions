@@ -46,7 +46,7 @@
       #step-progress-fill {
         width: 0%;
         height: 100%;
-        background: rgba(50, 115, 235, 0.95);
+        background: #e5531a;
         transition: width 0.2s ease;
       }
 
@@ -77,26 +77,35 @@
         padding: 10px 20px;
         font-size: 14px;
         cursor: pointer;
-        border: none;
+        border: 1px solid rgba(255, 255, 255, 0.15);
         border-radius: 8px;
-        background: rgba(255, 255, 255, 0.92);
-        transition: background 0.2s, transform 0.2s;
+        background: rgba(0, 0, 0, 0.62);
+        backdrop-filter: blur(4px);
+        color: rgba(255, 255, 255, 0.88);
+        transition: background 0.15s, box-shadow 0.15s, transform 0.2s;
         min-width: 150px;
         text-align: left;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
       }
 
       #set-selector button.active {
-        background: rgba(50, 115, 235, 0.95);
+        background: linear-gradient(to bottom, #52bc2c 0%, #2e9016 100%);
+        border-color: transparent;
         color: #fff;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 3px 10px rgba(0,0,0,0.28);
         transform: scale(1.02);
       }
 
       #set-selector button:not(.active):hover {
-        background: rgba(255, 255, 255, 1);
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.25);
       }
 
       #set-selector button.active:hover {
-        background: rgba(50, 115, 235, 0.95);
+        background: linear-gradient(to bottom, #5ccf32 0%, #339918 100%);
         color: #fff;
       }
 
@@ -190,14 +199,21 @@
         padding: 12px 24px;
         font-size: 14px;
         cursor: pointer;
-        background: rgba(255, 255, 255, 0.9);
+        background: linear-gradient(to bottom, #52bc2c 0%, #2e9016 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 3px 10px rgba(0,0,0,0.28);
+        color: #fff;
         border: none;
         border-radius: 8px;
-        transition: background 0.2s;
+        transition: background 0.15s, box-shadow 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        letter-spacing: 0.02em;
       }
 
       #buttons button:hover {
-        background: rgba(255, 255, 255, 1);
+        background: linear-gradient(to bottom, #5ccf32 0%, #339918 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(0,0,0,0.32);
       }
 
       #instructions-overlay {
@@ -267,14 +283,16 @@
           display: flex;
         }
 
-        #set-selector button {
+      #set-selector button {
           background: rgba(255, 255, 255, 0.12);
+          border-color: rgba(255,255,255,0.18);
           color: #fff;
           min-width: 160px;
         }
 
         #set-selector button.active {
-          background: rgba(50, 115, 235, 0.95);
+          background: linear-gradient(to bottom, #52bc2c 0%, #2e9016 100%);
+          border-color: transparent;
           color: #fff;
         }
 
@@ -313,11 +331,11 @@
         }
 
         #instruction-panel {
-          width: min(380px, calc(100vw - 32px));
+          width: min(280px, calc(100vw - 76px));
           top: 16px;
-          left: 50%;
-          right: auto;
-          transform: translateX(-50%);
+          right: 12px;
+          left: auto;
+          transform: none;
         }
 
         #instruction-title {
@@ -344,9 +362,9 @@
     <div id="container"></div>
     <button id="menu-toggle" aria-label="Open section menu" aria-expanded="false">&#9776;</button>
     <div id="set-selector">
-      <button id="setUnpackingBtn" class="active">Unpacking</button>
-      <button id="setInstallationBtn">Installation</button>
-      <button id="airControlsBtn">Air Controls</button>
+      <button id="setUnpackingBtn" class="active">📦 Unpacking</button>
+      <button id="setInstallationBtn">🔧 Installation</button>
+      <button id="airControlsBtn">🔥 Air Controls</button>
       <!-- <div id="activeSetLabel" class="label">Set: Unpacking</div> -->
     </div>
     <section id="instruction-panel" aria-live="polite">
@@ -373,8 +391,8 @@
       </div>
       <div id="step-progress-label">0 of 0 steps</div>
       <div class="button-row">
-        <button id="prevBtn">Previous</button>
-        <button id="nextBtn">Next</button>
+        <button id="prevBtn">&#8592; Previous</button>
+        <button id="nextBtn">Next &#8594;</button>
       </div>
     </div>
     <!-- <script type="module" src="src/stoveInstructions.js"></script> -->
