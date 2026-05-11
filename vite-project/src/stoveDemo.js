@@ -2259,6 +2259,7 @@ renderer.domElement.style.webkitUserSelect = 'none';
 renderer.domElement.style.webkitTouchCallout = 'none';
 
 container.appendChild(renderer.domElement);
+renderer.domElement.style.touchAction = 'none';
 
 const composer = new EffectComposer(renderer);
 

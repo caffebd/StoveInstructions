@@ -35,7 +35,7 @@ const MOBILE_CAMERA_STEP_OVERRIDES = {
     },
     rear_outlet_config_4: {
       distanceMultiplier: 1.18,
-      targetOffset: [0.25, 0.0, 0.0],
+      targetOffset: [0.12, 0.0, 0.0],
     },
   },
 };
@@ -1051,6 +1051,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
 container.appendChild(renderer.domElement);
+renderer.domElement.style.touchAction = 'none';
 
 const composer = new EffectComposer(renderer);
 
