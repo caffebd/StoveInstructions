@@ -722,6 +722,7 @@ const animationSets = [
       'step_9',
       'step_10',
       'step_11',
+      
     ],
   },
   {
@@ -737,6 +738,7 @@ const animationSets = [
       'rear_outlet_config_1',
       'rear_outlet_config_2',
       'rear_outlet_config_3',
+      'rear_outlet_config_4',
       'flue_cage_install',
     ],
   },
