@@ -901,8 +901,8 @@ const metal_uniforms = {
   maskSelect: { value: 1 },
   stoveColorA: { value: new THREE.Color('#959595') },
   stoveColorB: { value: new THREE.Color('#959595') },
-  stoveRoughA: { value: 0.241 },
-  stoveRoughB: { value: 0.103 },
+  stoveRoughA: { value: 0.15 },
+  stoveRoughB: { value: 0.15 },
 }
 
 const metal_mat = new CustomShaderMaterial({
