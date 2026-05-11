@@ -91,8 +91,13 @@
         transform: scale(1.02);
       }
 
-      #set-selector button:hover {
+      #set-selector button:not(.active):hover {
         background: rgba(255, 255, 255, 1);
+      }
+
+      #set-selector button.active:hover {
+        background: rgba(50, 115, 235, 0.95);
+        color: #fff;
       }
 
       #set-selector .label {
@@ -220,7 +225,63 @@
         color: #ccc;
       }
 
+      #menu-toggle {
+        display: none;
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 200;
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.74);
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+
       @media (max-width: 768px) {
+        #menu-toggle {
+          display: flex;
+        }
+
+        #set-selector {
+          display: none;
+          top: 70px;
+          left: 12px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+          background: rgba(0, 0, 0, 0.74);
+          backdrop-filter: blur(4px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          padding: 8px;
+        }
+
+        #set-selector.open {
+          display: flex;
+        }
+
+        #set-selector button {
+          background: rgba(255, 255, 255, 0.12);
+          color: #fff;
+          min-width: 160px;
+        }
+
+        #set-selector button.active {
+          background: rgba(50, 115, 235, 0.95);
+          color: #fff;
+        }
+
+        #set-selector button:not(.active):hover {
+          background: rgba(255, 255, 255, 0.22);
+        }
+
         #buttons {
           bottom: 30px;
           gap: 8px;
@@ -252,11 +313,11 @@
         }
 
         #instruction-panel {
-          width: calc(100vw - 20px);
-          max-width: calc(100vw - 20px);
-          top: 10px;
-          right: 10px;
-          left: 10px;
+          width: min(380px, calc(100vw - 32px));
+          top: 16px;
+          left: 50%;
+          right: auto;
+          transform: translateX(-50%);
         }
 
         #instruction-title {
@@ -281,6 +342,7 @@
     <!-- <button onclick="playAction('DoorOpen')">Open Door</button>
     <button onclick="playAction('DoorClose')">Close Door</button> -->
     <div id="container"></div>
+    <button id="menu-toggle" aria-label="Open section menu" aria-expanded="false">&#9776;</button>
     <div id="set-selector">
       <button id="setUnpackingBtn" class="active">Unpacking</button>
       <button id="setInstallationBtn">Installation</button>
