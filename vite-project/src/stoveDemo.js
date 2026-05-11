@@ -2209,11 +2209,11 @@ const timer = {
 };
 
 document.getElementById('setUnpackingBtn')?.addEventListener('click', () => {
-  window.location.assign('/index.html?set=unpacking');
+  window.location.assign('/instructions.html?set=unpacking');
 });
 
 document.getElementById('setInstallationBtn')?.addEventListener('click', () => {
-  window.location.assign('/index.html?set=installation');
+  window.location.assign('/instructions.html?set=installation');
 });
 
 document.getElementById('airControlsBtn')?.addEventListener('click', () => {

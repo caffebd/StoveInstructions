@@ -9,6 +9,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(rootDir, 'index.html'),
+        instructions: resolve(rootDir, 'instructions.html'),
         stoveDemo: resolve(rootDir, 'stoveDemo.html'),
       },
     },

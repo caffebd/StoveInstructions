@@ -15,38 +15,52 @@
         overflow: hidden;
         background: #000;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-        -webkit-tap-highlight-color: transparent;
       }
 
       #container {
         width: 100vw;
         height: 100vh;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-      }
-
-      canvas {
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-        touch-action: none;
       }
 
       #buttons {
         position: fixed;
         bottom: 20px;
-        /* left: 20%; */
-        /* transform: translateX(-20%); */
+        left: 50%;
+        transform: translateX(-50%); 
         display: flex;
+        flex-direction: column;
+        align-items: center;
         gap: 10px;
         z-index: 100;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
+        width: min(420px, calc(100vw - 40px));
+      }
+
+      #step-progress {
+        width: 100%;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      #step-progress-fill {
+        width: 0%;
+        height: 100%;
+        background: #e5531a;
+        transition: width 0.2s ease;
+      }
+
+      #step-progress-label {
+        font-size: 13px;
+        color: #fff;
+        opacity: 0.9;
+      }
+
+      .button-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        justify-content: center;
       }
 
       #set-selector {
@@ -95,11 +109,17 @@
         color: #fff;
       }
 
+      #set-selector .label {
+        color: #fff;
+        font-size: 13px;
+        opacity: 0.85;
+      }
+
       #instruction-panel {
         position: fixed;
         top: 20px;
         right: 20px;
-        width: min(460px, calc(100vw - 40px));
+        width: min(420px, calc(100vw - 40px));
         background: rgba(0, 0, 0, 0.74);
         color: #fff;
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -142,16 +162,19 @@
         color: #fff;
       }
 
+      #instruction-collapse-btn {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
       #instruction-panel-body {
         border-top: 1px solid rgba(255, 255, 255, 0.15);
         padding: 12px 18px 16px;
-      }
-
-      #instruction-summary {
-        margin: 0 0 10px;
-        font-size: 14px;
-        line-height: 1.5;
-        color: rgba(255, 255, 255, 0.95);
       }
 
       #instruction-bullets {
@@ -168,51 +191,6 @@
         color: rgba(255, 255, 255, 0.95);
       }
 
-      #instruction-panel-nav {
-        margin-top: 14px;
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      #instruction-panel-nav button {
-        flex: 1;
-        padding: 10px 14px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        background: linear-gradient(to bottom, #52bc2c 0%, #2e9016 100%);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 3px 10px rgba(0,0,0,0.28);
-        color: #fff;
-        font-size: 13px;
-        transition: background 0.15s, box-shadow 0.15s;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-        letter-spacing: 0.02em;
-      }
-
-      #instruction-panel-nav button:not(:disabled):hover {
-        background: linear-gradient(to bottom, #5ccf32 0%, #339918 100%);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(0,0,0,0.32);
-      }
-
-      #instruction-panel-nav button:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-
-      #instruction-collapse-btn {
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.12);
-        color: #fff;
-        padding: 6px 10px;
-        font-size: 12px;
-        cursor: pointer;
-      }
-
       #instruction-panel.collapsed #instruction-panel-body {
         display: none;
       }
@@ -221,26 +199,21 @@
         padding: 12px 24px;
         font-size: 14px;
         cursor: pointer;
-        background: rgba(255, 255, 255, 0.9);
+        background: linear-gradient(to bottom, #52bc2c 0%, #2e9016 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 3px 10px rgba(0,0,0,0.28);
+        color: #fff;
         border: none;
         border-radius: 8px;
-        transition: background 0.2s;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-        touch-action: manipulation;
-      }
-
-      input[type='range'] {
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-        touch-action: none;
-        accent-color: #e5531a;
+        transition: background 0.15s, box-shadow 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        letter-spacing: 0.02em;
       }
 
       #buttons button:hover {
-        background: rgba(255, 255, 255, 1);
+        background: linear-gradient(to bottom, #5ccf32 0%, #339918 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(0,0,0,0.32);
       }
 
       #instructions-overlay {
@@ -310,7 +283,7 @@
           display: flex;
         }
 
-        #set-selector button {
+      #set-selector button {
           background: rgba(255, 255, 255, 0.12);
           border-color: rgba(255,255,255,0.18);
           color: #fff;
@@ -341,18 +314,6 @@
           min-width: 70px;
         }
 
-        #instruction-panel {
-          width: min(280px, calc(100vw - 76px));
-          top: 16px;
-          right: 12px;
-          left: auto;
-          transform: none;
-        }
-
-        #instruction-title {
-          font-size: 16px;
-        }
-
         #instructions-overlay {
           top: 10px;
           left: 10px;
@@ -367,6 +328,18 @@
 
         #instructions-overlay p {
           font-size: 15px;
+        }
+
+        #instruction-panel {
+          width: min(280px, calc(100vw - 76px));
+          top: 16px;
+          right: 12px;
+          left: auto;
+          transform: none;
+        }
+
+        #instruction-title {
+          font-size: 16px;
         }
       }
 
@@ -389,25 +362,23 @@
     <div id="container"></div>
     <button id="menu-toggle" aria-label="Open section menu" aria-expanded="false">&#9776;</button>
     <div id="set-selector">
-      <button id="airControlsBtn" class="active">🔥 Air Controls</button>
-      <button id="setUnpackingBtn">📦 Unpacking</button>
+      <button id="airControlsBtn">🔥 Air Controls</button>
+      <button id="setUnpackingBtn" class="active">📦 Unpacking</button>
       <button id="setInstallationBtn">🔧 Installation</button>
+      <!-- <div id="activeSetLabel" class="label">Set: Unpacking</div> -->
     </div>
     <section id="instruction-panel" aria-live="polite">
       <div id="instruction-panel-header">
         <div id="instruction-panel-title-wrap">
-          <div id="instruction-step-label">Section 1 of 3</div>
-          <h2 id="instruction-title">Air Controls</h2>
+          <div id="instruction-step-label">Step --</div>
+          <h2 id="instruction-title">Unpacking Instructions</h2>
         </div>
         <button id="instruction-collapse-btn" type="button" aria-expanded="true">Collapse</button>
       </div>
       <div id="instruction-panel-body">
-        <p id="instruction-summary"></p>
-        <ul id="instruction-bullets"></ul>
-        <div id="instruction-panel-nav">
-          <button id="instruction-prev-btn" type="button">&#8592; Previous</button>
-          <button id="instruction-next-btn" type="button">Next &#8594;</button>
-        </div>
+        <ul id="instruction-bullets">
+          <li>Use Next to begin the selected set.</li>
+        </ul>
       </div>
     </section>
     <!-- <div id="instructions-overlay"> -->
@@ -415,26 +386,16 @@
       <!-- <p id="instruction-text">Click any step button below to see product instructions.</p> -->
     <!-- </div> -->
     <div id="buttons">
-      <!-- <button id="instructions">Instructions</button>
-      <button id="demo">Demo</button> -->
-      <!-- <button id="btn-1">Step 1</button>
-      <button id="btn-2">Step 2</button>
-      <button id="btn-3">Step 3</button>
-      <button id="btn-4">Step 4</button>
-      <button id="btn-5">Step 5</button>
-      <button id="btn-6">Step 6</button>
-      <button id="btn-7">Step 7</button>
-      <button id="btn-8">Step 8</button>
-      <button id="btn-9">Step 9</button>
-      <button id="btn-10">Step 10</button>
-      <button id="btn-11">Step 11</button>
-      <button id="btn-12">Step 12</button> -->
-      <!-- <button id="btn-left">Left</button>
-      <button id="btn-middle">Middle</button>
-      <button id="btn-right">Right</button> -->
-      <!-- <button id="btn-reset">Reset</button> -->
+      <div id="step-progress">
+        <div id="step-progress-fill"></div>
+      </div>
+      <div id="step-progress-label">0 of 0 steps</div>
+      <div class="button-row">
+        <button id="prevBtn">&#8592; Previous</button>
+        <button id="nextBtn">Next &#8594;</button>
+      </div>
     </div>
     <!-- <script type="module" src="src/stoveInstructions.js"></script> -->
-    <script type="module" src="src/stoveDemo.js"></script>
+    <script type="module" src="src/stoveInstructions.js"></script>
   </body>
 </html>
