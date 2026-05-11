@@ -332,6 +332,15 @@ customMaterials.forEach(mat => {
   integrate("noiseSpeedDelta",  "noiseSpeed",  0.0, 3.0);
 });
   
+  if (scene.environmentRotation) {
+    scene.environmentRotation.set(
+      camera.rotation.x + environmentBaseRotation.x,
+      camera.rotation.y + environmentBaseRotation.y,
+      camera.rotation.z + environmentBaseRotation.z,
+      camera.rotation.order
+    );
+  }
+
   if (mixer) mixer.update(delta);
   if (controls) controls.update();
 
@@ -2256,7 +2265,7 @@ Object.assign(lerpSlider.style, {
   accentColor: '#e5531a',
 });
 lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)));
-container.appendChild(lerpSlider);
+// container.appendChild(lerpSlider);
 
 const scene = new THREE.Scene();
 
@@ -2283,12 +2292,12 @@ composer.addPass(renderPass);
 
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.18,   // intensity
+  0.1,   // intensity
   0.1,   // radius
-  0.8    // threshold
+  0.85    // threshold
 );
 
-// composer.addPass(bloom);
+composer.addPass(bloom);
 
 const outputPass = new OutputPass();
 composer.addPass( outputPass );
@@ -2306,11 +2315,12 @@ rgbe.load(
     console.error('Failed to load HDR environment map for stoveDemo:', error);
   }
 );
-scene.environmentRotation.set(0, 0, 0);
+const environmentBaseRotation = new THREE.Euler(0, 0, 0);
+scene.environmentRotation.copy(environmentBaseRotation);
 scene.background = new THREE.Color('#C5BEB6');
 scene.backgroundBlurriness = 1;
 // scene.backgroundIntensity = 0.9;
-scene.environmentIntensity = 0.8;
+scene.environmentIntensity = 0.99;
 
 const axesHelper = new THREE.AxesHelper( 5 );
 // scene.add( axesHelper );
