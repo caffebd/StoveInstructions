@@ -5,8 +5,8 @@ varying vec4 COLOR;
 varying vec2 UV;
 varying vec3 VERTEX;
 
-uniform sampler2D stoveMasksAO;
-// uniform sampler2D stoveNormals;
+uniform sampler2D stoveMasks;
+uniform sampler2D stoveAO;
 uniform vec3 lightCol;
 uniform float lightStrength;
 uniform vec3 lightPos;
@@ -91,22 +91,21 @@ const fragmentShaderSource = `
 ${preamble}
 
 void main() {
-	vec2 uv = UV * 20.0;
-	vec4 masks = texture(stoveMasksAO, uv);
-	float ao = texture(stoveMasksAO, UV).a - 0.03;
-	// float ao = texture(stoveMasksAO, UV).a - 0.07;
+	vec2 uv = UV * 18.0;
+	vec4 masks = texture(stoveMasks, uv);
+	float ao = texture(stoveAO, UV).a;
 
 
-	float flicker = smoothRandom(objectOrigin, TIME, 1.0);
+	float flicker = smoothRandom(vec3(1.0), TIME, 1.0);
 
-	vec3 flame_light = pointLight(objectPos, lightPos, lightCol, lightStrength * mix(0.4, 0.75, flicker), lightRange, lightFalloff);
+	vec3 flame_light = pointLight(worldPos, lightPos, lightCol, lightStrength * mix(0.4, 0.75, flicker), lightRange, lightFalloff);
 	vec3 albedo = vec3(mix(stoveColB, stoveColA, masks.r - 0.4));
-  	// albedo = albedo + (flame_light * 1.0);
+  	albedo = albedo + (flame_light * 1.0);
 	float rough = mix(stoveRoughA, stoveRoughB, masks.r);
 
 	csm_DiffuseColor = vec4(vec3(albedo), 1.0);
 	csm_Roughness = rough;
-	// csm_AO = 1.0 - ao;
+	csm_AO = 1.0 - ao;
 
 
 }

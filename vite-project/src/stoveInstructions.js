@@ -488,20 +488,30 @@ logTex.wrapS = THREE.RepeatWrapping;
 logTex.wrapT = THREE.RepeatWrapping;
 logTex.colorSpace = THREE.SRGBColorSpace;
 
-const stoveMasksAO = textureLoader.load('/assets/textures/stove_masks_AO.png');
-stoveMasksAO.flipY = false;
-stoveMasksAO.wrapS = THREE.RepeatWrapping;
-stoveMasksAO.wrapT = THREE.RepeatWrapping;
+const dataPanelTex = textureLoader.load('/assets/textures/data_plate.png');
+logTex.flipY = false;
+logTex.wrapS = THREE.RepeatWrapping;
+logTex.wrapT = THREE.RepeatWrapping;
+logTex.colorSpace = THREE.SRGBColorSpace;
+
+const stoveMasks = textureLoader.load('/assets/textures/stove_masks.png');
+stoveMasks.flipY = false;
+stoveMasks.wrapS = THREE.RepeatWrapping;
+stoveMasks.wrapT = THREE.RepeatWrapping;
 
 const stoveNormals = textureLoader.load('/assets/textures/stove_normals_1.png');
 stoveNormals.flipY = false;
 stoveNormals.wrapS = THREE.RepeatWrapping;
 stoveNormals.wrapT = THREE.RepeatWrapping;
 
-// UNIFORMS & MATERIALS -----------------------------
+const stoveAO = textureLoader.load('/assets/textures/stove_separate_ao.png');
+stoveAO.flipY = false;
+
+// STOVE BODY --------------------------
 
 const stove_insulation_uniforms = {
-  stoveMasksAO: { value: stoveMasksAO },
+  stoveMasks: { value: stoveMasks },
+  stoveAO: { value: stoveAO },
   TIME:           { value: 0.0 },
   lightCol:       { value: new THREE.Color('#ff4400') },
   lightStrength:  { value: 0.0 },
@@ -516,14 +526,15 @@ const stove_insulation_uniforms = {
 
 const stove_insulation_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
-  // specularIntensityMap: stoveMasksAO,
+  specularIntensityMap: stoveAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: stove_insulation_uniforms,
 });
 
 const cast_iron_uniforms = {
-  stoveMasksAO: { value: stoveMasksAO },
+  stoveMasks: { value: stoveMasks },
+  stoveAO: { value: stoveAO },
   TIME:           { value: 0.0 },
   lightCol:       { value: new THREE.Color('#ff4400') },
   lightStrength:  { value: 0.0 },
@@ -539,8 +550,7 @@ const cast_iron_uniforms = {
 const cast_iron_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
   normalMap: stoveNormals,
-  // normalScale: 0.0,
-  // specularIntensityMap: stoveMasksAO,
+  specularIntensityMap: stoveAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: cast_iron_uniforms,
@@ -562,7 +572,8 @@ const cast_iron_mat = new CustomShaderMaterial({
 });
 
 const stove_body_uniforms = {
-  stoveMasksAO: { value: stoveMasksAO },
+  stoveMasks: { value: stoveMasks },
+  stoveAO: { value: stoveAO },
   TIME:           { value: 0.0 },
   lightCol:       { value: new THREE.Color('#ff4400') },
   lightStrength:  { value: 0.0 },
@@ -577,8 +588,7 @@ const stove_body_uniforms = {
 
 const stove_body_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial, 
-  // normalMap: stoveNormals,
-  // specularIntensityMap: stoveMasksAO,
+  specularIntensityMap: stoveAO,
   vertexShader: stoveBodyVertexShader,
   fragmentShader: stoveBodyFragmentShader,
   uniforms: stove_body_uniforms,
@@ -591,7 +601,7 @@ const rope_mat = new CustomShaderMaterial({
   vertexShader: ropeVertexShader,
   fragmentShader: ropeFragmentShader,
   uniforms: {
-    stoveMasksAO: stoveMasksAO,
+    stoveMasks: stoveMasks,
   },
   normalMap: stoveNormals,
   patchMap: {
@@ -616,9 +626,30 @@ const rubber_mat = new THREE.MeshStandardMaterial({
   roughness: 0.8,
 })
 
+const metal_uniforms = {
+  TIME: { value: 1.0 },
+  stoveMasks:   { value: stoveMasks },
+  stoveAO: { value: stoveAO },
+  maskSelect: { value: 1 },
+  stoveColorA: { value: new THREE.Color('#959595') },
+  stoveColorB: { value: new THREE.Color('#959595') },
+  stoveRoughA: { value: 0.241 },
+  stoveRoughB: { value: 0.103 },
+}
+
+const metal_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshPhysicalMaterial,
+  specularIntensityMap: stoveAO,
+  vertexShader: metalVertexShader,
+  fragmentShader: metalFragmentShader,
+  uniforms: metal_uniforms,
+
+})
+
 const brushed_metal_uniforms = {
   TIME: { value: 1.0 },
-  stoveMasksAO:   { value: stoveMasksAO },
+  stoveMasks:   { value: stoveMasks },
+  stoveAO: { value: stoveAO },
   maskSelect: { value: 1 },
   stoveColorA: { value: new THREE.Color('#959595') },
   stoveColorB: { value: new THREE.Color('#888888') },
@@ -626,9 +657,19 @@ const brushed_metal_uniforms = {
   stoveRoughB: { value: 0.103 },
 }
 
+const brushed_metal_mat = new CustomShaderMaterial({
+  baseMaterial: THREE.MeshPhysicalMaterial,
+  specularIntensityMap: stoveAO,
+  vertexShader: metalVertexShader,
+  fragmentShader: metalFragmentShader,
+  uniforms: brushed_metal_uniforms,
+
+})
+
 const handle_metal_uniforms = {
   TIME: { value: 1.0 },
-  stoveMasksAO:   { value: stoveMasksAO },
+  stoveMasks:   { value: stoveMasks },
+  stoveAO: { value: stoveAO },
   maskSelect: { value: 2 },
   stoveColorA: { value: new THREE.Color('#544d48') },
   stoveColorB: { value: new THREE.Color('#544d48') },
@@ -636,18 +677,9 @@ const handle_metal_uniforms = {
   stoveRoughB: { value: 0.198 },
 }
 
-const brushed_metal_mat = new CustomShaderMaterial({
-  baseMaterial: THREE.MeshPhysicalMaterial,
-  // specularIntensityMap: stoveMasksAO,
-  vertexShader: metalVertexShader,
-  fragmentShader: metalFragmentShader,
-  uniforms: brushed_metal_uniforms,
-
-})
-
 const handle_metal_mat = new CustomShaderMaterial({
   baseMaterial: THREE.MeshPhysicalMaterial,
-  // specularIntensityMap: stoveMasksAO,
+  specularIntensityMap: stoveAO,
   vertexShader: metalVertexShader,
   fragmentShader: metalFragmentShader,
   uniforms: handle_metal_uniforms,
@@ -810,6 +842,9 @@ loader.load(
           child.material = rubber_mat;
 
         } else if (child.material.name === 'metal') {
+          child.material = metal_mat;
+
+        } else if (child.material.name === 'brushed_metal') {
           child.material = brushed_metal_mat;
           
         } else if (child.material.name === 'handle') {
