@@ -345,7 +345,25 @@ customMaterials.forEach(mat => {
   if (controls) controls.update();
 
   updateLeverHighlight(delta);
+
+  // Render main view
+  camera.aspect = window.innerWidth / (window.innerHeight - leverInsetHeight);
+  camera.updateProjectionMatrix();
   composer.render();
+
+  // Render bottom inset view in its own renderer
+  const originalEnvRotation = scene.environmentRotation?.clone();
+  if (scene.environmentRotation) {
+    scene.environmentRotation.copy(environmentBaseRotation);
+  }
+
+  leverCamera.aspect = window.innerWidth / leverInsetHeight;
+  leverCamera.updateProjectionMatrix();
+  bottomRenderer.render(scene, leverCamera);
+
+  if (scene.environmentRotation && originalEnvRotation) {
+    scene.environmentRotation.copy(originalEnvRotation);
+  }
 
   stats.end();
 }
@@ -1666,6 +1684,7 @@ const leverOccluderTargets = [];
 const leverNodeNames = new Set();
 const leverPointerRaycaster = new THREE.Raycaster();
 const leverPointerNdc = new THREE.Vector2();
+const leverInsetHeight = 180;
 
 let hoveredLeverMesh = null;
 let draggingLeverMesh = null;
@@ -1783,10 +1802,25 @@ function addLeverDragCollider(leverMesh, position, radius) {
   leverPickTargets.push(collider);
 }
 
-function setLeverPointerNdc(event) {
-  const rect = renderer.domElement.getBoundingClientRect();
+function setLeverPointerNdc(event, rect) {
   leverPointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   leverPointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function getLeverViewportRect() {
+  const rect = bottomRenderer.domElement.getBoundingClientRect();
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+function isPointerInBottomViewport(event) {
+  const rect = bottomRenderer.domElement.getBoundingClientRect();
+  return event.clientX >= rect.left && event.clientX <= rect.right &&
+         event.clientY >= rect.top && event.clientY <= rect.bottom;
 }
 
 function getLeverTargetMesh(object) {
@@ -1848,10 +1882,20 @@ function updateLeverHighlight(delta) {
 }
 
 function isPointerOverLever(event) {
-  if (!stoveModel || leverPickTargets.length === 0) return false;
+  if (!stoveModel || leverPickTargets.length === 0) {
+    hoveredLeverMesh = null;
+    return false;
+  }
 
-  setLeverPointerNdc(event);
-  leverPointerRaycaster.setFromCamera(leverPointerNdc, camera);
+  if (!isPointerInBottomViewport(event)) {
+    hoveredLeverMesh = null;
+    if (!leverDragActive) bottomRenderer.domElement.style.cursor = '';
+    return false;
+  }
+
+  const viewportRect = getLeverViewportRect();
+  setLeverPointerNdc(event, viewportRect);
+  leverPointerRaycaster.setFromCamera(leverPointerNdc, leverCamera);
   const hits = leverPointerRaycaster.intersectObjects(
     [...leverPickTargets, ...leverOccluderTargets],
     true
@@ -1860,18 +1904,18 @@ function isPointerOverLever(event) {
 
   if (!hit) {
     hoveredLeverMesh = null;
-    if (!leverDragActive) renderer.domElement.style.cursor = '';
+    if (!leverDragActive) bottomRenderer.domElement.style.cursor = '';
     return false;
   }
 
   hoveredLeverMesh = getLeverTargetMesh(hit.object);
   if (!hoveredLeverMesh) {
-    if (!leverDragActive) renderer.domElement.style.cursor = '';
+    if (!leverDragActive) bottomRenderer.domElement.style.cursor = '';
     return false;
   }
 
   if (!leverDragActive) {
-    renderer.domElement.style.cursor = 'grab';
+    bottomRenderer.domElement.style.cursor = 'grab';
   }
 
   return true;
@@ -1883,15 +1927,15 @@ function stopLeverDragging() {
   leverDragPointerId = null;
   controls.enabled = true;
   draggingLeverMesh = null;
-  renderer.domElement.style.cursor = '';
+  bottomRenderer.domElement.style.cursor = '';
 }
 
 function setupLeverDragInteraction() {
-  const canvas = renderer.domElement;
+  const canvas = bottomRenderer.domElement;
 
   canvas.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (!isPointerOverLever(event)) return;
+    if (!isPointerInBottomViewport(event) || !isPointerOverLever(event)) return;
 
     leverDragActive = true;
     draggingLeverMesh = hoveredLeverMesh;
@@ -2339,7 +2383,15 @@ const container = document.getElementById('container');
 
 const stats = new Stats();
 container.appendChild(stats.dom);
-stats.dom.style.display = 'none';
+Object.assign(stats.dom.style, {
+  position: 'fixed',
+  right: '10px',
+  bottom: '10px',
+  top: 'auto',
+  left: 'auto',
+  zIndex: '1001',
+  opacity: '0.9',
+});
 
 // Slider for targetLerp (0-1)
 lerpSlider = document.createElement('input');
@@ -2366,21 +2418,67 @@ lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)
 
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / (window.innerHeight - 300), 0.01, 1000);
 camera.position.set(0.5, 0.1, 1.5);
+
+const leverCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 1000);
 
 const renderer = new THREE.WebGLRenderer({ antialias: qualityTier !== 'low' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.domElement.style.position = 'fixed';
+renderer.domElement.style.top = '0';
+renderer.domElement.style.left = '0';
+renderer.domElement.style.width = '100%';
+renderer.domElement.style.height = `calc(100vh - ${leverInsetHeight}px)`;
 renderer.domElement.style.touchAction = 'none';
 renderer.domElement.style.userSelect = 'none';
 renderer.domElement.style.webkitUserSelect = 'none';
 renderer.domElement.style.webkitTouchCallout = 'none';
 
 container.appendChild(renderer.domElement);
-renderer.domElement.style.touchAction = 'none';
+
+const bottomPanelFrame = document.createElement('div');
+Object.assign(bottomPanelFrame.style, {
+  position: 'fixed',
+  left: '0',
+  right: '0',
+  bottom: '0',
+  height: `${leverInsetHeight}px`,
+  overflow: 'hidden',
+  pointerEvents: 'auto',
+  borderRadius: '15px 15px 15px 15px',
+  border: '2px solid rgba(255,255,255,0.2)',
+  boxShadow: '0 20px 48px rgba(0,0,0,0.22)',
+  background: 'rgba(250, 250, 250, 0.92)',
+  zIndex: '1',
+});
+container.appendChild(bottomPanelFrame);
+
+const bottomRenderer = new THREE.WebGLRenderer({ antialias: qualityTier !== 'low' });
+bottomRenderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
+bottomRenderer.setSize(window.innerWidth, leverInsetHeight);
+bottomRenderer.outputColorSpace = THREE.SRGBColorSpace;
+bottomRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+bottomRenderer.domElement.style.width = '100%';
+bottomRenderer.domElement.style.height = '100%';
+bottomRenderer.domElement.style.touchAction = 'none';
+bottomRenderer.domElement.style.userSelect = 'none';
+bottomRenderer.domElement.style.webkitUserSelect = 'none';
+bottomRenderer.domElement.style.webkitTouchCallout = 'none';
+
+bottomPanelFrame.appendChild(bottomRenderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / (window.innerHeight - leverInsetHeight);
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
+  bottomRenderer.setSize(window.innerWidth, leverInsetHeight);
+  composer.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
+  bloom.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
+});
 
 const composer = new EffectComposer(renderer);
 
@@ -2525,6 +2623,15 @@ loader.load(
     console.log('Available actions:', Object.keys(actions));
 
     registerLeverDragTargets(stoveModel, gltf.animations);
+
+    // Position lever camera for close-up view
+    if (leverPickTargets.length > 0) {
+      const leverMesh = leverPickTargets[0];
+      const leverPosition = new THREE.Vector3();
+      leverMesh.getWorldPosition(leverPosition);
+      leverCamera.position.copy(leverPosition).add(new THREE.Vector3(0.0, 0.0, 0.7)); // close-up offset
+      leverCamera.lookAt(new THREE.Vector3(0.0, -0.5, -0.5));
+    }
 
 
     document.querySelectorAll('#buttons button').forEach((btn, i) => {
