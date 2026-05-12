@@ -347,7 +347,7 @@ customMaterials.forEach(mat => {
   updateLeverHighlight(delta);
 
   // Render main view
-  camera.aspect = window.innerWidth / (window.innerHeight - leverInsetHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   composer.render();
 
@@ -357,7 +357,9 @@ customMaterials.forEach(mat => {
     scene.environmentRotation.copy(environmentBaseRotation);
   }
 
-  leverCamera.aspect = window.innerWidth / leverInsetHeight;
+  const insetWidth = Math.max(bottomPanelFrame.clientWidth, 1);
+  const insetHeight = Math.max(bottomPanelFrame.clientHeight, 1);
+  leverCamera.aspect = insetWidth / insetHeight;
   leverCamera.updateProjectionMatrix();
   bottomRenderer.render(scene, leverCamera);
 
@@ -2418,21 +2420,21 @@ lerpSlider.addEventListener('input', (e) => setTarget(parseFloat(e.target.value)
 
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(40, window.innerWidth / (window.innerHeight - 300), 0.01, 1000);
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
 camera.position.set(0.5, 0.1, 1.5);
 
 const leverCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 1000);
 
 const renderer = new THREE.WebGLRenderer({ antialias: qualityTier !== 'low' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
-renderer.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
+renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.domElement.style.position = 'fixed';
 renderer.domElement.style.top = '0';
 renderer.domElement.style.left = '0';
 renderer.domElement.style.width = '100%';
-renderer.domElement.style.height = `calc(100vh - ${leverInsetHeight}px)`;
+renderer.domElement.style.height = '100%';
 renderer.domElement.style.touchAction = 'none';
 renderer.domElement.style.userSelect = 'none';
 renderer.domElement.style.webkitUserSelect = 'none';
@@ -2443,23 +2445,25 @@ container.appendChild(renderer.domElement);
 const bottomPanelFrame = document.createElement('div');
 Object.assign(bottomPanelFrame.style, {
   position: 'fixed',
-  left: '0',
-  right: '0',
-  bottom: '0',
+  left: '50%',
+  right: 'auto',
+  transform: 'translateX(-50%)',
+  bottom: '16px',
   height: `${leverInsetHeight}px`,
+  width: `${Math.min(window.innerWidth - 68, 900)}px`,
   overflow: 'hidden',
   pointerEvents: 'auto',
-  borderRadius: '15px 15px 15px 15px',
+  borderRadius: '20px',
   border: '2px solid rgba(255,255,255,0.2)',
-  boxShadow: '0 20px 48px rgba(0,0,0,0.22)',
+  boxShadow: '0 16px 34px rgba(0,0,0,0.26)',
   background: 'rgba(250, 250, 250, 0.92)',
-  zIndex: '1',
+  zIndex: '2',
 });
 container.appendChild(bottomPanelFrame);
 
 const bottomRenderer = new THREE.WebGLRenderer({ antialias: qualityTier !== 'low' });
 bottomRenderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
-bottomRenderer.setSize(window.innerWidth, leverInsetHeight);
+bottomRenderer.setSize(bottomPanelFrame.clientWidth, bottomPanelFrame.clientHeight);
 bottomRenderer.outputColorSpace = THREE.SRGBColorSpace;
 bottomRenderer.toneMapping = THREE.ACESFilmicToneMapping;
 bottomRenderer.domElement.style.width = '100%';
@@ -2471,13 +2475,31 @@ bottomRenderer.domElement.style.webkitTouchCallout = 'none';
 
 bottomPanelFrame.appendChild(bottomRenderer.domElement);
 
+function applyBottomPanelLayout() {
+  const isMobile = window.innerWidth <= 768;
+  const sideMargin = isMobile ? 16 : 34;
+  const width = Math.max(240, Math.min(window.innerWidth - sideMargin * 2, 900));
+  const height = isMobile ? 150 : leverInsetHeight;
+  const bottom = isMobile ? 12 : 16;
+  const radius = isMobile ? 18 : 20;
+
+  bottomPanelFrame.style.width = `${width}px`;
+  bottomPanelFrame.style.height = `${height}px`;
+  bottomPanelFrame.style.bottom = `${bottom}px`;
+  bottomPanelFrame.style.borderRadius = `${radius}px`;
+
+  bottomRenderer.setSize(width, height, false);
+}
+
+applyBottomPanelLayout();
+
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / (window.innerHeight - leverInsetHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
-  bottomRenderer.setSize(window.innerWidth, leverInsetHeight);
-  composer.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
-  bloom.setSize(window.innerWidth, window.innerHeight - leverInsetHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  applyBottomPanelLayout();
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloom.setSize(window.innerWidth, window.innerHeight);
 });
 
 const composer = new EffectComposer(renderer);
@@ -2742,15 +2764,6 @@ loader.load(
   undefined,
   (error) => { console.error(error); }
 );
-
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-});
 
 
 window.playActionLerp = playActionLerp;
