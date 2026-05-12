@@ -1703,7 +1703,8 @@ let leverLastClientX = 0;
 
 const LEVER_DRAG_SENSITIVITY = 1 / 250;
 const START_CAMERA_POSITION = new THREE.Vector3(0.58, 0.14, 2.02);
-const START_CAMERA_TARGET = new THREE.Vector3(0.0, -0.06, 0.0);
+const MOBILE_START_CAMERA_POSITION = new THREE.Vector3(0.58, 0.14, 2.14);
+const START_CAMERA_TARGET = new THREE.Vector3(0.0, -0.2, 0.0);
 
 function extractClipNodeNames(clip) {
   const names = new Set();
@@ -2425,6 +2426,9 @@ const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
 camera.position.copy(START_CAMERA_POSITION);
+if (isMobileViewport()) {
+  camera.position.copy(MOBILE_START_CAMERA_POSITION);
+}
 
 const leverCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 1000);
 
