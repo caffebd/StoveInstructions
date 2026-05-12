@@ -1702,6 +1702,8 @@ let leverDragPointerId = null;
 let leverLastClientX = 0;
 
 const LEVER_DRAG_SENSITIVITY = 1 / 250;
+const MOBILE_START_CAMERA_POSITION = new THREE.Vector3(0.58, 0.18, 1.9);
+const MOBILE_START_CAMERA_TARGET = new THREE.Vector3(0.0, -0.06, 0.0);
 
 function extractClipNodeNames(clip) {
   const names = new Set();
@@ -2393,6 +2395,7 @@ Object.assign(stats.dom.style, {
   left: 'auto',
   zIndex: '1001',
   opacity: '0.9',
+  display: 'none',
 });
 
 // Slider for targetLerp (0-1)
@@ -2422,6 +2425,9 @@ const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 1000);
 camera.position.set(0.5, 0.1, 1.5);
+if (isMobileViewport()) {
+  camera.position.copy(MOBILE_START_CAMERA_POSITION);
+}
 
 const leverCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 1000);
 
@@ -2477,10 +2483,10 @@ bottomPanelFrame.appendChild(bottomRenderer.domElement);
 
 function applyBottomPanelLayout() {
   const isMobile = window.innerWidth <= 768;
-  const sideMargin = isMobile ? 16 : 34;
+  const sideMargin = isMobile ? 28 : 34;
   const width = Math.max(240, Math.min(window.innerWidth - sideMargin * 2, 900));
   const height = isMobile ? 150 : leverInsetHeight;
-  const bottom = isMobile ? 12 : 16;
+  const bottom = isMobile ? 18 : 16;
   const radius = isMobile ? 18 : 20;
 
   bottomPanelFrame.style.width = `${width}px`;
@@ -2546,6 +2552,9 @@ const axesHelper = new THREE.AxesHelper( 5 );
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 0, 0);
+if (isMobileViewport()) {
+  controls.target.copy(MOBILE_START_CAMERA_TARGET);
+}
 controls.mouseButtons = {
   LEFT: THREE.MOUSE.PAN = 2,
   MIDDLE: THREE.MOUSE.ROTATE = 0,
